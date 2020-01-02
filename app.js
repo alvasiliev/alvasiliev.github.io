@@ -189,6 +189,10 @@ class PhysicsEngine {
         this.UNIT_SIZE = 10; // 10px
     }
 
+    reset() {
+        this.movedAt = null;
+    }
+
     moveAll() {
         const now = new Date().getTime();
         const timePassed = this.movedAt ? now - this.movedAt : 0;
@@ -474,6 +478,8 @@ class Game {
         this.addFigure(this.background);
         this.addFigure(this.ship);
         asteroids.forEach(a => this.addFigure(a));
+
+        this.physicsEngine.reset();
     }
 
     generateAsteroids() {
@@ -586,6 +592,7 @@ class Game {
 
     start() {
         if (!this.intervalHandle) {
+            this.physicsEngine.reset();
             this.intervalHandle = setInterval(() => this.performAll(), 1000 / this.calcFrequency);
         }
         if (this.isFinished) {
