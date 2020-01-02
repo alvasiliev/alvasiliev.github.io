@@ -204,6 +204,7 @@ class SplashScreen {
             context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
             context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
             context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
+            context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 170);
         }
     }
 }
@@ -237,6 +238,7 @@ class PauseScreen {
         context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
         context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
         context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 170);
     }
 }
 
@@ -269,6 +271,7 @@ class GameOverScreen {
         context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
         context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
         context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 170);
     }
 }
 
@@ -301,6 +304,7 @@ class WinnerScreen {
         context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
         context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
         context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 170);
     }
 }
 
@@ -658,6 +662,10 @@ class Game {
         }
         setTimeout(() => imageManager.load(), 200);
 
+        this.configureKeys();
+    }
+
+    configureKeys() {
         document.addEventListener("keypress", function (event) {
             if (event.code === 'Enter') {
                 if (!this.intervalHandle) {
@@ -665,6 +673,17 @@ class Game {
                 } else {
                     this.pause();
                 }
+            }
+        }.bind(this));
+
+        document.addEventListener("keyup", function (event) {
+            if (event.code === 'Escape') {
+                if (this.intervalHandle) {
+                    clearInterval(this.intervalHandle);
+                    this.intervalHandle = null;
+                }
+                this.isFinished = true;
+                this.renderEngine.drawSplashScreen();
             }
         }.bind(this));
     }
