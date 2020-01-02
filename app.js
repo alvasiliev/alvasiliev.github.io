@@ -145,7 +145,7 @@ class RenderEngine {
         const canvas = document.createElement('canvas');
         canvas.width = viewportWidth;
         canvas.height = viewportHeight;
-        document.body.append(canvas);
+        document.getElementById('root').append(canvas);
         this.context = canvas.getContext('2d');
 
         this.fpsCalculatedAt = new Date().getTime();
@@ -408,8 +408,8 @@ class Game {
         this.keys = new Keys();
         this.figures = new Figures();
 
-        this.width = 800;
-        this.height = 600;
+        this.width = 1024;
+        this.height = 768;
         this.renderEngine = new RenderEngine(this.width, this.height, this.figures);
         this.physicsEngine = new PhysicsEngine(this.width, this.height, this.figures);
         this.collisionEngine = new CollisionEngine(this.figures);

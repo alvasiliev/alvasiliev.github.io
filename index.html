@@ -2,12 +2,40 @@
 <html>
 
 <head>
-    <title>Canvas</title>
+    <title>Asteroids</title>
+    <style>
+        html,
+        body {
+            background-color: #000;
+        }
+
+        canvas {
+            margin: 0 auto;
+            display: block;
+        }
+
+        .buttons {
+            text-align: center;
+        }
+
+        button {
+            background-color: #55d;
+            border: 1px solid #ccc;
+            color: #eee;
+            padding: 5px 15px;
+            min-width: 70px;
+            margin: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 
 <body>
-    <h2>Canvas</h2>
-    <div>
+    <div id="root">
+
+    </div>
+    <div class="buttons">
         <button onclick="game.start()">Start</button>
         <button onclick="game.pause()">Pause</button>
     </div>
