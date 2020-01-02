@@ -29,13 +29,11 @@ class GameObject {
 }
 
 class Sprite {
-    constructor(imgSrc, width, height, position) {
+    constructor(image, width, height, position) {
         this.width = width;
         this.height = height;
         this.position = position;
-
-        this.image = new Image();
-        this.image.src = imgSrc;
+        this.image = image;
     }
 
     draw(context) {
@@ -80,6 +78,46 @@ class Circle {
 
 // Engines
 
+class ImageManager {
+    constructor() {
+        this.images = {}
+        this.loadedCount = 0;
+        this.imgList = [
+            'space',
+            'stars_small',
+            'stars_large',
+            'cloud_small',
+            'cloud_large',
+            'ship',
+            'missle',
+            'asteroid'
+        ];
+        this.onLoadFinished = null;
+    }
+
+    load() {
+        this.imgList.forEach(img => this.loadImage(img));
+    }
+
+    get(imageName) {
+        return this.images[imageName];
+    }
+
+    loadImage(imgSrc) {
+        const image = new Image();
+        image.src = 'sprites/' + imgSrc + '.png';
+        image.onload = () => {
+            this.images[imgSrc] = image;
+            this.loadedCount += 1;
+
+            if (this.loadedCount === this.imgList.length && this.onLoadFinished) {
+                this.onLoadFinished();
+            }
+        }
+        return image;
+    }
+}
+
 class Figures {
     constructor() {
         this.figures = [];
@@ -117,9 +155,6 @@ class Keys {
                 case 'ControlLeft':
                     this.state[event.code] = true;
                     break;
-                default:
-                    console.log(event.code);
-                    break;
             }
         }.bind(this));
 
@@ -134,6 +169,138 @@ class Keys {
                     break;
             }
         }.bind(this));
+    }
+}
+
+class SplashScreen {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.background = new Rect(width, height, '#0E0855');
+    }
+
+    draw(context, isLoading) {
+        this.background.draw(context);
+
+        context.fillStyle = '#ddd';
+        context.font = "48px 'Courier New', Courier, monospace";
+        context.fillText("ASTEROIDS", this.width / 2 - 130, this.height / 2 - 50);
+
+        if (isLoading) {
+            context.fillStyle = '#aaa';
+            context.font = "18px 'Courier New', Courier, monospace";
+            context.fillText("Loading...", this.width / 2 - 50, this.height / 2 - 9);
+        } else {
+            context.fillStyle = '#aaa';
+            context.font = "18px 'Courier New', Courier, monospace";
+            context.fillText("Press ENTER play", this.width / 2 - 85, this.height / 2 - 9);
+
+            const textLeft = this.width / 2 - 130;
+            context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
+
+            context.font = "16px 'Courier New', Courier, monospace";
+            context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
+            context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
+            context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
+            context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
+            context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
+        }
+    }
+}
+
+class PauseScreen {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.background = new Rect(width, height, '#000');
+    }
+
+    draw(context) {
+        context.globalAlpha = 0.5;
+        this.background.draw(context);
+        context.globalAlpha = 1;
+
+        context.fillStyle = '#ddd';
+        context.font = "48px 'Courier New', Courier, monospace";
+        context.fillText("PAUSE", this.width / 2 - 80, this.height / 2 - 50);
+
+        context.fillStyle = '#aaa';
+        context.font = "18px 'Courier New', Courier, monospace";
+        context.fillText("Press ENTER continue", this.width / 2 - 110, this.height / 2 - 9);
+
+        const textLeft = this.width / 2 - 110;
+        context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
+
+        context.font = "16px 'Courier New', Courier, monospace";
+        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
+    }
+}
+
+class GameOverScreen {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.background = new Rect(width, height, '#900');
+    }
+
+    draw(context) {
+        context.globalAlpha = 0.5;
+        this.background.draw(context);
+        context.globalAlpha = 1;
+
+        context.fillStyle = '#ddd';
+        context.font = "48px 'Courier New', Courier, monospace";
+        context.fillText("GAME OVER", this.width / 2 - 120, this.height / 2 - 50);
+
+        context.fillStyle = '#aaa';
+        context.font = "18px 'Courier New', Courier, monospace";
+        context.fillText("Press ENTER restart", this.width / 2 - 110, this.height / 2 - 9);
+
+        const textLeft = this.width / 2 - 110;
+        context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
+
+        context.font = "16px 'Courier New', Courier, monospace";
+        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
+    }
+}
+
+class WinnerScreen {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.background = new Rect(width, height, '#090');
+    }
+
+    draw(context) {
+        context.globalAlpha = 0.5;
+        this.background.draw(context);
+        context.globalAlpha = 1;
+
+        context.fillStyle = '#ddd';
+        context.font = "48px 'Courier New', Courier, monospace";
+        context.fillText("WELL DONE", this.width / 2 - 120, this.height / 2 - 50);
+
+        context.fillStyle = '#aaa';
+        context.font = "18px 'Courier New', Courier, monospace";
+        context.fillText("Press ENTER restart", this.width / 2 - 110, this.height / 2 - 9);
+
+        const textLeft = this.width / 2 - 110;
+        context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
+
+        context.font = "16px 'Courier New', Courier, monospace";
+        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
     }
 }
 
@@ -153,6 +320,26 @@ class RenderEngine {
         this.framesCount = 0;
         this.fps = 0;
         this.fpsStep = 100;
+    }
+
+    drawSplashScreen(isLoading) {
+        const screen = new SplashScreen(this.width, this.height);
+        screen.draw(this.context, isLoading);
+    }
+
+    drawPauseScreen() {
+        const screen = new PauseScreen(this.width, this.height);
+        screen.draw(this.context);
+    }
+
+    drawGameOverScreen() {
+        const screen = new GameOverScreen(this.width, this.height);
+        screen.draw(this.context);
+    }
+
+    drawWinnerScreen() {
+        const screen = new WinnerScreen(this.width, this.height);
+        screen.draw(this.context);
     }
 
     drawFrame() {
@@ -328,25 +515,24 @@ class CollisionEngine {
 // Objects
 
 class Img {
-    constructor(x, y, angle, width, height, imgSrc) {
+    constructor(x, y, angle, width, height, image) {
         this.x = x;
         this.y = y;
         this.angle = angle;
         this.width = width;
         this.height = height;
-        this.image = new Image();
-        this.image.src = imgSrc;
+        this.image = image;
     }
 }
 
 class Background {
     constructor(width, height) {
         this.sprites = {
-            space: new Img(width / 2, height / 2, 0, width, height, 'space.png'),
-            starsSmall: new Img(width / 2, height / 2, 0, width, height, 'stars_small.png'),
-            starsLarge: new Img(width / 2, height / 2, 0, width, height, 'stars_large.png'),
-            cloudsSmall: new Img(width / 2, height / 2, 0, width, height, 'cloud_small.png'),
-            cloudsLarge: new Img(width / 2, height / 2, 0, width, height, 'cloud_large.png'),
+            space: new Img(width / 2, height / 2, 0, width, height, imageManager.get('space')),
+            starsSmall: new Img(width / 2, height / 2, 0, width, height, imageManager.get('stars_small')),
+            starsLarge: new Img(width / 2, height / 2, 0, width, height, imageManager.get('stars_large')),
+            cloudsSmall: new Img(width / 2, height / 2, 0, width, height, imageManager.get('cloud_small')),
+            cloudsLarge: new Img(width / 2, height / 2, 0, width, height, imageManager.get('cloud_large')),
         }
     }
 
@@ -387,7 +573,7 @@ class Ship {
         this.missleLaunchedAt = null;
 
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, 0, 0);
-        this.drawItem = new Sprite('ship.png', this.width, this.height, this.gameObject);
+        this.drawItem = new Sprite(imageManager.get('ship'), this.width, this.height, this.gameObject);
     }
 
     getDrawItem() {
@@ -416,7 +602,7 @@ class Missle {
         this.height = 10;
         this.speed = 100;
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, true);
-        this.drawItem = new Sprite('missle.png', this.width, this.height, this.gameObject);
+        this.drawItem = new Sprite(imageManager.get('missle'), this.width, this.height, this.gameObject);
     }
 
     getDrawItem() {
@@ -435,7 +621,7 @@ class Asteroid {
         this.height = radius * 2;
         this.speed = speed;
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, false, spinSpeed);
-        this.drawItem = new Sprite('asteroid.png', this.width, this.height, this.gameObject);
+        this.drawItem = new Sprite(imageManager.get('asteroid'), this.width, this.height, this.gameObject);
     }
 
     getDrawItem() {
@@ -450,7 +636,7 @@ class Asteroid {
 // Game
 
 class Game {
-    constructor() {
+    constructor(imageManager) {
         this.intervalHandle = null;
         this.calcFrequency = 60; // 60 раз в секунду
         this.isFinished = false;
@@ -464,10 +650,25 @@ class Game {
         this.physicsEngine = new PhysicsEngine(this.width, this.height, this.figures);
         this.collisionEngine = new CollisionEngine(this.figures);
 
-        this.background = new Background(this.width, this.height);
-        this.ship = new Ship(this.width / 2, this.height / 2, 0);
+        this.renderEngine.drawSplashScreen(true);
+        imageManager.onLoadFinished = () => {
+            this.background = new Background(this.width, this.height);
+            this.ship = new Ship(this.width / 2, this.height / 2, 0);
+            this.init();
 
-        this.init();
+            this.renderEngine.drawSplashScreen(false);
+        }
+        setTimeout(() => imageManager.load(), 200);
+
+        document.addEventListener("keypress", function (event) {
+            if (event.code === 'Enter') {
+                if (!this.intervalHandle) {
+                    this.start();
+                } else {
+                    this.pause();
+                }
+            }
+        }.bind(this));
     }
 
     init() {
@@ -554,40 +755,42 @@ class Game {
     }
 
     performAll() {
-        if (!this.isFinished) {
-            this.processUserControl();
-            this.physicsEngine.moveAll();
-        }
+        this.processUserControl();
+        this.physicsEngine.moveAll();
         this.renderEngine.drawFrame();
 
-        if (!this.isFinished) {
-            const newAsteriods = this.collisionEngine.checkMissleCollisions();
-            for (let a of newAsteriods) {
-                this.addFigure(a);
-            }
+        const newAsteriods = this.collisionEngine.checkMissleCollisions();
+        for (let a of newAsteriods) {
+            this.addFigure(a);
+        }
 
-            // Remove all destroyed objects
-            const figuresWithoutDestroyed = this.figures.get().filter(f => !f.getGameObject || !f.getGameObject().getIsDestroyed());
-            this.figures.set(figuresWithoutDestroyed);
+        // Remove all destroyed objects
+        const figuresWithoutDestroyed = this.figures.get().filter(f => !f.getGameObject || !f.getGameObject().getIsDestroyed());
+        this.figures.set(figuresWithoutDestroyed);
 
-            const isShipCollision = this.collisionEngine.checkShipCollisions();
-            if (isShipCollision) {
-                this.loose();
-            } else {
-                const asteroids = this.figures.get().filter(f => f instanceof Asteroid);
-                if (asteroids.length === 0) {
-                    this.win();
-                }
+        const isShipCollision = this.collisionEngine.checkShipCollisions();
+        if (isShipCollision) {
+            this.loose();
+        } else {
+            const asteroids = this.figures.get().filter(f => f instanceof Asteroid);
+            if (asteroids.length === 0) {
+                this.win();
             }
         }
     }
 
     loose() {
         this.isFinished = true;
+        clearInterval(this.intervalHandle);
+        this.intervalHandle = null;
+        this.renderEngine.drawGameOverScreen();
     }
 
     win() {
         this.isFinished = true;
+        clearInterval(this.intervalHandle);
+        this.intervalHandle = null;
+        this.renderEngine.drawWinnerScreen();
     }
 
     start() {
@@ -605,10 +808,12 @@ class Game {
         if (this.intervalHandle) {
             clearInterval(this.intervalHandle);
             this.intervalHandle = null;
+            this.renderEngine.drawPauseScreen();
         }
     }
 }
 
 // Initialization
 
-const game = new Game();
+const imageManager = new ImageManager();
+const game = new Game(imageManager);

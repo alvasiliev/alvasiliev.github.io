@@ -7,38 +7,19 @@
         html,
         body {
             background-color: #000;
+            margin: 0;
+            padding: 0;
         }
 
         canvas {
             margin: 0 auto;
             display: block;
         }
-
-        .buttons {
-            text-align: center;
-        }
-
-        button {
-            background-color: #55d;
-            border: 1px solid #ccc;
-            color: #eee;
-            padding: 5px 15px;
-            min-width: 70px;
-            margin: 5px;
-            border-radius: 3px;
-            cursor: pointer;
-        }
     </style>
 </head>
 
 <body>
-    <div id="root">
-
-    </div>
-    <div class="buttons">
-        <button onclick="game.start()">Start</button>
-        <button onclick="game.pause()">Pause</button>
-    </div>
+    <div id="root"></div>
     <script src="app.js"></script>
 </body>
 
