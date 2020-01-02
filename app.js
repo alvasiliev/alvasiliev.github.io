@@ -316,17 +316,53 @@ class CollisionEngine {
 
 // Objects
 
+class Img {
+    constructor(x, y, angle, width, height, imgSrc) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+        this.width = width;
+        this.height = height;
+        this.image = new Image();
+        this.image.src = imgSrc;
+    }
+}
+
 class Background {
     constructor(width, height) {
-        const position = {
-            x: width / 2,
-            y: height / 2
+        this.sprites = {
+            space: new Img(width / 2, height / 2, 0, width, height, 'space.png'),
+            starsSmall: new Img(width / 2, height / 2, 0, width, height, 'stars_small.png'),
+            starsLarge: new Img(width / 2, height / 2, 0, width, height, 'stars_large.png'),
+            cloudsSmall: new Img(width / 2, height / 2, 0, width, height, 'cloud_small.png'),
+            cloudsLarge: new Img(width / 2, height / 2, 0, width, height, 'cloud_large.png'),
         }
-        this.drawItem = new Sprite('space.png', width, height, position);
+    }
+
+    drawSprite(context, sprite) {
+        context.save();
+        context.translate(sprite.x, sprite.y);
+        context.rotate(sprite.angle);
+        context.drawImage(
+            sprite.image,
+            0, 0, sprite.width, sprite.height,
+            -sprite.width / 2, -sprite.height / 2, sprite.width, sprite.height
+        );
+        context.restore();
+    }
+
+    drawAll(context) {
+        this.drawSprite(context, this.sprites.space);
+        this.drawSprite(context, this.sprites.starsSmall);
+        this.drawSprite(context, this.sprites.starsLarge);
+        this.drawSprite(context, this.sprites.cloudsSmall);
+        this.drawSprite(context, this.sprites.cloudsLarge);
     }
 
     getDrawItem() {
-        return this.drawItem;
+        return {
+            draw: context => this.drawAll(context)
+        };
     }
 }
 
