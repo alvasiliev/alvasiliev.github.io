@@ -318,7 +318,11 @@ class CollisionEngine {
 
 class Background {
     constructor(width, height) {
-        this.drawItem = new Rect(width, height, '#78f');
+        const position = {
+            x: width / 2,
+            y: height / 2
+        }
+        this.drawItem = new Sprite('space.png', width, height, position);
     }
 
     getDrawItem() {
@@ -328,8 +332,8 @@ class Background {
 
 class Ship {
     constructor(x, y, angle) {
-        this.width = 40;
-        this.height = 40;
+        this.width = 60;
+        this.height = 60;
         this.maxSpeed = 20; // Скорость движения: 20 юнитов в секунду
         this.maxRotateSpeed = 0.25; // Скорость разворота: 0.25 оборота в секунду
         this.shootsPerSecond = 5; // Скорострельность: 5 выстрелов в секунду
