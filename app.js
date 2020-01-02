@@ -653,9 +653,7 @@ class Game {
         this.renderEngine.drawSplashScreen(true);
         imageManager.onLoadFinished = () => {
             this.background = new Background(this.width, this.height);
-            this.ship = new Ship(this.width / 2, this.height / 2, 0);
             this.init();
-
             this.renderEngine.drawSplashScreen(false);
         }
         setTimeout(() => imageManager.load(), 200);
@@ -674,6 +672,8 @@ class Game {
     init() {
         this.background.getDrawItem().color = '#78f';
         this.figures.set([]);
+
+        this.ship = new Ship(this.width / 2, this.height / 2, 0);
 
         const asteroids = this.generateAsteroids();
         this.addFigure(this.background);
