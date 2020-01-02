@@ -1,14 +1,16 @@
 // Primitives
 
 class GameObject {
-    constructor(x, y, width, height, angle, speed, rotateSpeed, destroyOnLeave) {
+    constructor(x, y, width, height, angle, speed, rotateSpeed, destroyOnLeave, spinSpeed) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
-        this.angle = angle || 0;
+        this.angle = angle || 0; // Направление полёта
         this.speed = speed || 0; // Юнитов в секунду
-        this.rotateSpeed = rotateSpeed || 0; // Оборотов в секунду
+        this.rotateSpeed = rotateSpeed || 0; // Скорость поворота - оборотов в секунду
+        this.spinAngle = 0; // Положение разворота относительно оси. Не влияет на направление полёта
+        this.spinSpeed = spinSpeed || 0; // Скорость вращения отновительно оси
         this.destroyOnLeave = destroyOnLeave;
         this.isDestroyed = false;
     }
@@ -39,10 +41,9 @@ class Sprite {
     draw(context) {
         context.save();
         context.translate(this.position.x, this.position.y);
-        context.rotate(this.position.angle);
+        context.rotate(this.position.angle + this.position.spinAngle);
         context.drawImage(
             this.image,
-            0, 0, this.width, this.height,
             -this.width / 2, -this.height / 2, this.width, this.height
         );
         context.restore();
@@ -216,6 +217,11 @@ class PhysicsEngine {
             gameObject.angle += anglePassed;
         }
 
+        if (gameObject.spinSpeed) {
+            const spinPassed = 2 * Math.PI * gameObject.spinSpeed * timePassed / 1000;
+            gameObject.spinAngle += spinPassed;
+        }
+
         if (this.checkOutsideViewport(gameObject)) {
             if (gameObject.getDestroyOnLeave()) {
                 gameObject.destroy();
@@ -304,10 +310,11 @@ class CollisionEngine {
             const wreckleSpeed = a.speed * 1.5;
             const x = a.getGameObject().x;
             const y = a.getGameObject().y;
+            const spinSpeed = a.getGameObject().spinSpeed * 2;
 
-            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed));
-            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed));
-            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed));
+            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
+            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
+            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
         }
 
         return wreckles;
@@ -418,14 +425,13 @@ class Missle {
 }
 
 class Asteroid {
-    constructor(x, y, angle, radius, speed) {
+    constructor(x, y, angle, radius, speed, spinSpeed) {
         this.radius = radius;
         this.width = radius * 2;
         this.height = radius * 2;
         this.speed = speed;
-        this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, false);
-        this.drawItem = new Circle(this.radius, '#555', this.gameObject);
-        //this.drawItem = new Sprite('asteroid.png', this.width, this.height, this.gameObject);
+        this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, false, spinSpeed);
+        this.drawItem = new Sprite('asteroid.png', this.width, this.height, this.gameObject);
     }
 
     getDrawItem() {
@@ -476,7 +482,8 @@ class Game {
         const minRadius = 20;
         const maxRadius = 70;
         const minSpeed = 1;
-        const maxSpeed = 20
+        const maxSpeed = 20;
+        const maxSpin = 0.5;
         for (let i = 0; i < asteroidsCount; ++i) {
             const rand = Math.random();
             const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
@@ -501,7 +508,9 @@ class Game {
 
             const angle = Math.random() * 360 * Math.PI / 180;
 
-            const a = new Asteroid(x, y, angle, radius, speed);
+            const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
+
+            const a = new Asteroid(x, y, angle, radius, speed, spinSpeed);
             asteroids.push(a);
         }
         return asteroids;
@@ -568,12 +577,10 @@ class Game {
     }
 
     loose() {
-        this.background.getDrawItem().color = '#f78';
         this.isFinished = true;
     }
 
     win() {
-        this.background.getDrawItem().color = '#7f8';
         this.isFinished = true;
     }
 
