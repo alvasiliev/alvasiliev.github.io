@@ -124,12 +124,19 @@ class Keys {
 class RenderEngine {
     constructor(viewportWidth, viewportHeight, figures) {
         this.figures = figures;
+        this.width = viewportWidth;
+        this.height = viewportHeight;
 
         const canvas = document.createElement('canvas');
         canvas.width = viewportWidth;
         canvas.height = viewportHeight;
         document.body.append(canvas);
         this.context = canvas.getContext('2d');
+
+        this.fpsCalculatedAt = new Date().getTime();
+        this.framesCount = 0;
+        this.fps = 0;
+        this.fpsStep = 100;
     }
 
     drawFrame() {
@@ -138,6 +145,22 @@ class RenderEngine {
                 f.getDrawItem().draw(this.context);
             }
         }
+        this.drawFps();
+    }
+
+    drawFps() {
+        this.framesCount += 1;
+        if (this.framesCount === this.fpsStep) {
+            const now = new Date().getTime();
+            const timePassed = now - this.fpsCalculatedAt;
+            this.fps = this.framesCount * 1000 / timePassed;
+            this.framesCount = 0;
+            this.fpsCalculatedAt = now;
+        }
+
+        this.context.fillStyle = '#888';
+        this.context.font = "14px serif";
+        this.context.fillText("fps: " + this.fps.toFixed(1), this.width - 60, 20);
     }
 }
 
