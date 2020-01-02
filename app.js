@@ -1,27 +1,108 @@
+// Primitives
+
+class GameObject {
+    constructor(x, y, width, height, angle, speed, rotateSpeed, destroyOnLeave) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.angle = angle || 0;
+        this.speed = speed || 0; // Юнитов в секунду
+        this.rotateSpeed = rotateSpeed || 0; // Оборотов в секунду
+        this.destroyOnLeave = destroyOnLeave;
+        this.isDestroyed = false;
+    }
+
+    getDestroyOnLeave() {
+        return !!this.destroyOnLeave;
+    }
+
+    destroy() {
+        this.isDestroyed = true;
+    }
+
+    getIsDestroyed() {
+        return !!this.isDestroyed;
+    }
+}
+
+class Sprite {
+    constructor(imgSrc, width, height, position) {
+        this.width = width;
+        this.height = height;
+        this.position = position;
+
+        this.image = new Image();
+        this.image.src = imgSrc;
+    }
+
+    draw(context) {
+        context.save();
+        context.translate(this.position.x, this.position.y);
+        context.rotate(this.position.angle);
+        context.drawImage(
+            this.image,
+            0, 0, this.width, this.height,
+            -this.width / 2, -this.height / 2, this.width, this.height
+        );
+        context.restore();
+    }
+}
+
+class Rect {
+    constructor(width, height, color) {
+        this.width = width;
+        this.height = height;
+        this.color = color;
+    }
+
+    draw(context) {
+        context.fillStyle = this.color;
+        context.fillRect(0, 0, this.width, this.height);
+    }
+}
+
+// Engines
+
+class Figures {
+    constructor() {
+        this.figures = [];
+    }
+
+    get() {
+        return this.figures;
+    }
+
+    set(figures) {
+        this.figures = figures;
+    }
+
+    add(f) {
+        this.figures.push(f);
+    }
+}
+
 class Keys {
     constructor() {
-        this.keyLeft = false;
-        this.keyRight = false;
-        this.keyUp = false;
-        this.keyDown = false;
-        this.keySpace = false;
+        this.state = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            ArrowUp: false,
+            ArrowDown: false,
+            ControlLeft: false
+        };
 
         document.addEventListener("keydown", function (event) {
             switch (event.code) {
                 case 'ArrowLeft':
-                    this.keyLeft = true;
-                    break;
                 case 'ArrowUp':
-                    this.keyUp = true;
-                    break;
                 case 'ArrowRight':
-                    this.keyRight = true;
-                    break;
                 case 'ArrowDown':
-                    this.keyDown = true;
+                case 'ControlLeft':
+                    this.state[event.code] = true;
                     break;
-                case 'Space':
-                    this.keySpace = true;
+                default:
+                    console.log(event.code);
                     break;
             }
         }.bind(this));
@@ -29,181 +110,137 @@ class Keys {
         document.addEventListener("keyup", function (event) {
             switch (event.code) {
                 case 'ArrowLeft':
-                    this.keyLeft = false;
-                    break;
                 case 'ArrowUp':
-                    this.keyUp = false;
-                    break;
                 case 'ArrowRight':
-                    this.keyRight = false;
-                    break;
                 case 'ArrowDown':
-                    this.keyDown = false;
-                    break;
-                case 'Space':
-                    this.keySpace = false;
+                case 'ControlLeft':
+                    this.state[event.code] = false;
                     break;
             }
         }.bind(this));
     }
 }
 
-class Engine {
-    constructor(width, height) {
-        this.isRunning = false;
-        this.width = width;
-        this.height = height;
-
-        const root = document.body;
+class RenderEngine {
+    constructor(viewportWidth, viewportHeight, figures) {
+        this.figures = figures;
 
         const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        root.append(canvas);
-        const context = canvas.getContext('2d');
-
-        this.keys = new Keys();
-
-        this.figures = [];
-
-        const background = new Background(context, width, height);
-        this.figures.push(background);
-
-        const ship = new Ship(context, this.keys);
-        this.figures.push(ship);
+        canvas.width = viewportWidth;
+        canvas.height = viewportHeight;
+        document.body.append(canvas);
+        this.context = canvas.getContext('2d');
     }
 
-    drawAll() {
-        for (let i = 0; i < this.figures.length; ++i) {
-            const f = this.figures[i];
-            let destroy = false;
-            if (f.move) {
-                f.move();
-
-                if (f instanceof Ship) {
-                    if (f.x > this.width + f.width / 2) f.x = f.x - this.width - f.width;
-                    else if (f.x < -f.width / 2) f.x = f.x + this.width + f.width;
-
-                    if (f.y > this.height + f.height / 2) f.y = f.y - this.height - f.height;
-                    else if (f.y < -f.height / 2) f.y = f.y + this.height + f.height;
-                } else {
-                    if (
-                        f.x > this.width + f.width / 2 ||
-                        f.x < -f.width / 2 ||
-                        f.y > this.height + f.height / 2 ||
-                        f.y < -f.height / 2
-                    ) {
-                        destroy = true;
-                    }
-                }
+    drawFrame() {
+        for (let f of this.figures.get()) {
+            if (f.getDrawItem) {
+                f.getDrawItem().draw(this.context);
             }
-            if (this.keys.keySpace && f.launchMissle) {
-                const missle = f.launchMissle();
-                if (missle) {
-                    this.figures.push(missle);
-                }
-            }
-            f.draw();
-            if (destroy) {
-                this.figures[i] = null;
-            }
-        }
-        this.figures = this.figures.filter(x => !!x); // remove destroyed figures
-    }
-
-    start() {
-        if (!this.isRunning) {
-            this.isRunning = true;
-            this.handle = setInterval(() => this.drawAll(), 1000 / 60); // 60 frames per second
-        }
-    }
-
-    pause() {
-        if (this.isRunning) {
-            this.isRunning = false;
-            clearInterval(this.handle);
         }
     }
 }
 
-class Background {
-    constructor(context, width, height) {
-        this.context = context;
-        this.width = width;
-        this.height = height;
-        this.color = '#bbb';
+class PhysicsEngine {
+    constructor(viewportWidth, viewportHeight, figures) {
+        this.width = viewportWidth;
+        this.height = viewportHeight;
+        this.figures = figures;
+        this.movedAt = null;
+        this.UNIT_SIZE = 10; // 10px
     }
 
-    draw() {
-        this.context.fillStyle = this.color;
-        this.context.fillRect(0, 0, this.width, this.height);
+    moveAll() {
+        const now = new Date().getTime();
+        const timePassed = this.movedAt ? now - this.movedAt : 0;
+        this.movedAt = now;
+        if (!timePassed) return;
+
+        for (let f of this.figures.get()) {
+            if (f.getGameObject) {
+                this.moveGameObject(f.getGameObject(), timePassed);
+            }
+        }
+
+        const figuresWithoutDestroyed = this.figures.get().filter(f => !f.getGameObject || !f.getGameObject().getIsDestroyed());
+        this.figures.set(figuresWithoutDestroyed);
+    }
+
+    moveGameObject(gameObject, timePassed) {
+        const pathPassed = this.UNIT_SIZE * gameObject.speed * (timePassed / 1000);
+
+        if (pathPassed) {
+            const pathX = pathPassed * Math.cos(gameObject.angle);
+            const pathY = pathPassed * Math.sin(gameObject.angle);
+            gameObject.x += pathX;
+            gameObject.y += pathY;
+        }
+
+        if (gameObject.rotateSpeed) {
+            const anglePassed = 2 * Math.PI * gameObject.rotateSpeed * timePassed / 1000;
+            gameObject.angle += anglePassed;
+        }
+
+        if (this.checkOutsideViewport(gameObject)) {
+            if (gameObject.getDestroyOnLeave()) {
+                gameObject.destroy();
+            } else {
+                if (gameObject.x < -gameObject.width / 2) gameObject.x += this.width + gameObject.width;
+                else if (gameObject.x > this.width + gameObject.width / 2) gameObject.x -= this.width + gameObject.width;
+
+                if (gameObject.y < -gameObject.height / 2) gameObject.y += this.height + gameObject.height;
+                else if (gameObject.y > this.height + gameObject.height / 2) gameObject.y -= this.height + gameObject.height;
+            }
+        }
+    }
+
+    checkOutsideViewport(f) {
+        return (f.x > this.width + f.width / 2) ||
+            (f.x < -f.width / 2) ||
+            (f.y > this.height + f.height / 2) ||
+            (f.y < -f.height / 2);
+    }
+}
+
+// Objects
+
+class Background {
+    constructor(width, height) {
+        this.drawItem = new Rect(width, height, '#bbb');
+    }
+
+    getDrawItem() {
+        return this.drawItem;
     }
 }
 
 class Ship {
-    constructor(context, keys) {
-        this.context = context;
-        this.keys = keys;
-        this.x = 400;
-        this.y = 300;
-        this.speed = 0;
-        this.maxSpeed = 5;
-        this.angleSpeed = 0;
-        this.maxAngleSpeed = 100;
-        this.angle = 0;
+    constructor(x, y, angle) {
         this.width = 40;
         this.height = 40;
-        this.sprite = new Image();
-        this.sprite.src = 'ship.png';
-        this.missleTimeout = 200;
+        this.maxSpeed = 20; // Скорость движения: 20 юнитов в секунду
+        this.maxRotateSpeed = 0.25; // Скорость разворота: 0.25 оборота в секунду
+        this.shootsPerSecond = 5; // Скорострельность: 5 выстрелов в секунду
         this.missleLaunchedAt = null;
+
+        this.gameObject = new GameObject(x, y, this.width, this.height, angle, 0, 0);
+        this.drawItem = new Sprite('ship.png', this.width, this.height, this.gameObject);
     }
 
-    draw() {
-        this.context.save();
-        this.context.translate(this.x, this.y);
-        this.context.rotate(this.angle);
-        this.context.drawImage(
-            this.sprite,
-            0, 0, this.width, this.height,
-            -this.width / 2, -this.height / 2, this.width, this.height
-        );
-        this.context.restore();
+    getDrawItem() {
+        return this.drawItem;
     }
 
-    move() {
-        if (this.keys) {
-            const dAngle = 1;
-            if (this.keys.keyLeft && !this.keys.keyRight) {
-                if (this.angleSpeed > -this.maxAngleSpeed) this.angleSpeed -= dAngle;
-            } else if (this.keys.keyRight && !this.keys.keyLeft) {
-                if (this.angleSpeed < this.maxAngleSpeed) this.angleSpeed += dAngle;
-            } else {
-                if (this.angleSpeed > 0) this.angleSpeed -= dAngle;
-                else if (this.angleSpeed < 0) this.angleSpeed += dAngle;
-            }
-            this.angle += (this.angleSpeed / 50) * Math.PI / 180;
-
-            if (this.keys.keyUp) {
-                if (this.speed < this.maxSpeed) this.speed += 0.1;
-            } else {
-                if (this.speed > 0) this.speed -= 0.1;
-            }
-        }
-        if (this.speed) {
-            const speedX = this.speed * Math.cos(this.angle);
-            const speedY = this.speed * Math.sin(this.angle);
-            this.x += speedX;
-            this.y += speedY;
-        }
+    getGameObject() {
+        return this.gameObject;
     }
 
     launchMissle() {
         const now = new Date().getTime();
-        if (this.missleLaunchedAt == null || this.missleLaunchedAt + this.missleTimeout < now) {
+        const timeout = 1000 / this.shootsPerSecond;
+        if (this.missleLaunchedAt == null || this.missleLaunchedAt + timeout < now) {
             this.missleLaunchedAt = now;
-            const missle = new Missle(this.context, this.x, this.y, this.angle);
-            return missle;
+            return new Missle(this.gameObject.x, this.gameObject.y, this.gameObject.angle);
         } else {
             return null;
         }
@@ -211,44 +248,97 @@ class Ship {
 }
 
 class Missle {
-    constructor(context, x, y, angle) {
-        this.context = context;
-        this.x = x;
-        this.y = y;
-        this.speed = 7;
-        this.angle = angle;
+    constructor(x, y, angle) {
         this.width = 10;
         this.height = 10;
-        this.sprite = new Image();
-        this.sprite.src = 'missle.png';
+        this.speed = 100;
+        this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, true);
+        this.drawItem = new Sprite('missle.png', this.width, this.height, this.gameObject);
     }
 
-    draw() {
-        this.context.save();
-        this.context.translate(this.x, this.y);
-        this.context.rotate(this.angle);
-        this.context.drawImage(
-            this.sprite,
-            0, 0, this.width, this.height,
-            -this.width / 2, -this.height / 2, this.width, this.height
-        );
-        this.context.restore();
+    getDrawItem() {
+        return this.drawItem;
     }
 
-    move() {
-        const speedX = this.speed * Math.cos(this.angle);
-        const speedY = this.speed * Math.sin(this.angle);
-        this.x += speedX;
-        this.y += speedY;
+    getGameObject() {
+        return this.gameObject;
     }
 }
 
-const engine = new Engine(800, 600);
+// Game
 
-function start() {
-    engine.start();
+class Game {
+    constructor() {
+        this.intervalHandle = null;
+        this.calcFrequency = 60; // 60 раз в секунду
+
+        this.keys = new Keys();
+
+        this.figures = new Figures();
+
+        const width = 800;
+        const height = 600;
+        this.renderEngine = new RenderEngine(width, height, this.figures);
+        this.physicsEngine = new PhysicsEngine(width, height, this.figures);
+
+        this.background = new Background(width, height);
+        this.addFigure(this.background);
+
+        this.ship = new Ship(width / 2, height / 2, 0);
+        this.addFigure(this.ship);
+    }
+
+    addFigure(f) {
+        this.figures.add(f);
+    }
+
+    processUserControl() {
+        const k = this.keys.state;
+        // Rotate
+        if (k.ArrowLeft && !k.ArrowRight) {
+            this.ship.getGameObject().rotateSpeed = -this.ship.maxRotateSpeed;
+        } else if (!k.ArrowLeft && k.ArrowRight) {
+            this.ship.getGameObject().rotateSpeed = +this.ship.maxRotateSpeed;
+        } else {
+            this.ship.getGameObject().rotateSpeed = 0;
+        }
+
+        // Move
+        if (k.ArrowUp) {
+            this.ship.getGameObject().speed = this.ship.maxSpeed;
+        } else {
+            this.ship.getGameObject().speed = 0;
+        }
+
+        // Shoot
+        if (k.ControlLeft) {
+            const missle = this.ship.launchMissle();
+            if (missle) {
+                this.addFigure(missle);
+            }
+        }
+    }
+
+    performAll() {
+        this.processUserControl();
+        this.physicsEngine.moveAll();
+        this.renderEngine.drawFrame();
+    }
+
+    start() {
+        if (!this.intervalHandle) {
+            this.intervalHandle = setInterval(() => this.performAll(), 1000 / this.calcFrequency);
+        }
+    }
+
+    pause() {
+        if (this.intervalHandle) {
+            clearInterval(this.intervalHandle);
+            this.intervalHandle = null;
+        }
+    }
 }
 
-function pause() {
-    engine.pause();
-}
+// Initialization
+
+const game = new Game();
