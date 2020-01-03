@@ -132,18 +132,44 @@ class Sound {
     constructor(context, buffer) {
         this.context = context;
         this.buffer = buffer;
+        this.isPlaying = false;
+        this.gainNode = null;
+        this.source = null;
     }
 
-    play() {
-        const gainNode = this.context.createGain();
+    play(volume, isLooped, fadeIn) {
+        if (!isLooped || !this.isPlaying) {
+            this.isPlaying = true;
+            const now = this.context.currentTime;
 
-        const source = this.context.createBufferSource();
-        source.buffer = this.buffer;
-        source.connect(gainNode);
+            this.gainNode = this.context.createGain();
 
-        gainNode.connect(this.context.destination);
+            this.source = this.context.createBufferSource();
+            this.source.buffer = this.buffer;
+            this.source.loop = isLooped;
+            this.source.connect(this.gainNode);
 
-        source.start(this.context.currentTime);
+            this.gainNode.connect(this.context.destination);
+
+            if (!fadeIn) {
+                this.gainNode.gain.setValueAtTime(volume || 1, now);
+            } else {
+                this.gainNode.gain.setValueAtTime(0, now);
+                this.gainNode.gain.linearRampToValueAtTime(volume || 1, now + 0.5);
+            }
+
+            this.source.start(now);
+        }
+    }
+
+    stop() {
+        if (this.isPlaying) {
+            this.isPlaying = false;
+
+            const now = this.context.currentTime;
+            this.gainNode.gain.linearRampToValueAtTime(0, now + 1);
+            this.source.stop(now + 2);
+        }
     }
 }
 
@@ -158,6 +184,7 @@ class SoundManager {
             'gameover',
             'explosion',
             'shot',
+            'jet',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
@@ -173,9 +200,15 @@ class SoundManager {
     }
 
     get(soundName) {
-        return this.sounds[soundName] || {
-            play: function () {}
-        };
+        const audioBuffer = this.sounds[soundName];
+        if (!audioBuffer) {
+            return {
+                play: function () {},
+                stop: function () {}
+            };
+        } else {
+            return new Sound(this.context, audioBuffer)
+        }
     }
 
     async loadSound(sndSrc) {
@@ -185,7 +218,7 @@ class SoundManager {
             if (response.ok) {
                 const audioData = await response.arrayBuffer();
                 const decodedData = await this.context.decodeAudioData(audioData);
-                this.sounds[sndSrc] = new Sound(this.context, decodedData);
+                this.sounds[sndSrc] = decodedData;
             } else {
                 console.error('Failed to load sound: ' + sndSrc);
             }
@@ -367,6 +400,7 @@ class GameOverScreen {
         this.width = width;
         this.height = height;
         this.background = new Rect(width, height, '#900');
+        this.sound = null;
     }
 
     draw(context) {
@@ -393,7 +427,12 @@ class GameOverScreen {
         context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
         context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
 
-        soundManager.get('gameover').play();
+        this.playSound();
+    }
+
+    playSound() {
+        if (!this.sound) this.sound = soundManager.get('gameover');
+        this.sound.play();
     }
 }
 
@@ -402,6 +441,7 @@ class WinnerScreen {
         this.width = width;
         this.height = height;
         this.background = new Rect(width, height, '#090');
+        this.sound = null;
     }
 
     draw(context) {
@@ -428,7 +468,12 @@ class WinnerScreen {
         context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
         context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
 
-        soundManager.get('success').play();
+        this.playSound();
+    }
+
+    playSound() {
+        if (!this.sound) this.sound = soundManager.get('success');
+        this.sound.play();
     }
 }
 
@@ -680,11 +725,14 @@ class Ship {
         this.acceleration = 0;
         this.maxAcceleration = 0.0005;
         this.accelerationTurnedOnAt = null;
+        this.isEngineOn = false;
+        this.engineSound = null;
 
         this.maxRotateSpeed = 0.25; // Скорость разворота: 0.25 оборота в секунду
 
         this.shootsPerSecond = 5; // Скорострельность: 5 выстрелов в секунду
         this.missleLaunchedAt = null;
+        this.missleSound = null;
 
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, 0, 0);
         this.drawItem = new Sprite(imageManager.get('ship'), this.width, this.height, this.gameObject);
@@ -705,6 +753,10 @@ class Ship {
         }
     }
 
+    dispose() {
+        if (this.engineSound) this.engineSound.stop();
+    }
+
     getDrawItem() {
         return this.drawItem;
     }
@@ -718,7 +770,10 @@ class Ship {
         const timeout = 1000 / this.shootsPerSecond;
         if (this.missleLaunchedAt == null || this.missleLaunchedAt + timeout < now) {
             this.missleLaunchedAt = now;
-            soundManager.get('shot').play();
+
+            if (!this.missleSound) this.missleSound = soundManager.get('shot');
+            this.missleSound.play(0.1);
+
             return new Missle(this.gameObject.x, this.gameObject.y, this.gameObject.angle);
         } else {
             return null;
@@ -726,17 +781,22 @@ class Ship {
     }
 
     turnEngineOn() {
-        if (this.acceleration <= 0) {
+        if (!this.isEngineOn) {
+            this.isEngineOn = true;
             this.accelerationTurnedOnAt = new Date().getTime();
+            this.acceleration = this.maxAcceleration;
+            this.engineSound = soundManager.get('jet'); // New each time. This sound is looped it has to be stopped on engine off
+            this.engineSound.play(2, true, true);
         }
-        this.acceleration = this.maxAcceleration;
     }
 
     turnEngineOff() {
-        if (this.acceleration > 0) {
+        if (this.isEngineOn) {
+            this.isEngineOn = false;
             this.accelerationTurnedOnAt = new Date().getTime();
+            this.acceleration = -this.maxAcceleration;
+            if (this.engineSound) this.engineSound.stop();
         }
-        this.acceleration = -this.maxAcceleration;
     }
 
     turnRotationLeftOn() {
@@ -782,6 +842,7 @@ class Asteroid {
         this.speed = speed;
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, false, spinSpeed);
         this.drawItem = new Sprite(imageManager.get('asteroid'), this.width, this.height, this.gameObject);
+        this.explosionSound = null;
     }
 
     getDrawItem() {
@@ -794,7 +855,9 @@ class Asteroid {
 
     blowUp() {
         this.getGameObject().destroy();
-        soundManager.get('explosion').play();
+
+        if (!this.explosionSound) this.explosionSound = soundManager.get('explosion');
+        this.explosionSound.play();
 
         const wreckles = [];
 
@@ -1016,6 +1079,7 @@ class Game {
         clearInterval(this.intervalHandle);
         this.intervalHandle = null;
         this.renderEngine.drawGameOverScreen();
+        if (this.ship) this.ship.dispose();
     }
 
     win() {
@@ -1023,6 +1087,7 @@ class Game {
         clearInterval(this.intervalHandle);
         this.intervalHandle = null;
         this.renderEngine.drawWinnerScreen();
+        if (this.ship) this.ship.dispose();
     }
 
     start() {
