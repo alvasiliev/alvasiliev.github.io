@@ -84,6 +84,48 @@ class Circle {
     }
 }
 
+class AnimatedSprite {
+    constructor(image, width, height, imageWidth, imageHeight, position, numFramesX, numFramesY, looped, onFinishedHandler) {
+        this.position = position;
+        this.frameNumber = 0;
+        this.numFramesX = numFramesX;
+        this.numFramesY = numFramesY;
+        this.numFrames = numFramesX * numFramesY;
+        this.image = image;
+        this.width = width;
+        this.height = height;
+        this.imageWidth = imageWidth;
+        this.imageHeight = imageHeight;
+        this.looped = looped;
+        this.onFinishedHandler = onFinishedHandler;
+    }
+
+    draw(context) {
+        if (this.frameNumber >= this.numFrames) {
+            if (this.looped) {
+                this.frameNumber = 0;
+            } else {
+                if (this.onFinishedHandler) this.onFinishedHandler();
+                return;
+            }
+        }
+
+        const x = (this.frameNumber % this.numFramesX);
+        const y = Math.trunc(this.frameNumber / this.numFramesX);
+
+        context.save();
+        context.translate(this.position.x, this.position.y);
+        context.drawImage(
+            this.image,
+            x * this.imageWidth, y * this.imageHeight, this.imageWidth, this.imageHeight,
+            -this.width / 2, -this.height / 2, this.width, this.height
+        );
+        context.restore();
+
+        this.frameNumber += 1;
+    }
+}
+
 // Engines
 
 class ImageManager {
@@ -98,7 +140,8 @@ class ImageManager {
             'cloud_large',
             'ship',
             'missle',
-            'asteroid'
+            'asteroid',
+            'explosion',
         ];
         this.onLoadFinished = null;
     }
@@ -509,11 +552,15 @@ class CollisionEngine {
         a.getGameObject().destroy();
 
         const wreckles = [];
+
+        const x = a.getGameObject().x;
+        const y = a.getGameObject().y;
+        wreckles.push(new Explosion(x, y, a.radius * 2));
+
         if (a.radius > 20) {
             const wreckleRadius = a.radius / 3;
             const wreckleSpeed = a.speed * 1.5;
-            const x = a.getGameObject().x;
-            const y = a.getGameObject().y;
+
             const spinSpeed = a.getGameObject().spinSpeed * 2;
 
             wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
@@ -682,6 +729,29 @@ class Asteroid {
         this.speed = speed;
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, false, spinSpeed);
         this.drawItem = new Sprite(imageManager.get('asteroid'), this.width, this.height, this.gameObject);
+    }
+
+    getDrawItem() {
+        return this.drawItem;
+    }
+
+    getGameObject() {
+        return this.gameObject;
+    }
+}
+
+class Explosion {
+    constructor(x, y, radius) {
+        this.width = 100;
+        this.height = 100;
+        this.imgSrc = 'explosion';
+        this.numFramesX = 9;
+        this.numFramesY = 9;
+
+        this.gameObject = new GameObject(x, y, this.width, this.height, 0, 0, 0, false, 0);
+        this.drawItem = new AnimatedSprite(imageManager.get('explosion'), radius * 2, radius * 2, this.width, this.height, this.gameObject, this.numFramesX, this.numFramesY, false, () => {
+            this.gameObject.destroy();
+        });
     }
 
     getDrawItem() {
