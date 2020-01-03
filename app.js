@@ -26,6 +26,14 @@ class GameObject {
     getIsDestroyed() {
         return !!this.isDestroyed;
     }
+
+    getSpeed() {
+        return this.speed;
+    }
+
+    getRotateSpeed() {
+        return this.rotateSpeed;
+    }
 }
 
 class Sprite {
@@ -398,7 +406,7 @@ class PhysicsEngine {
     }
 
     moveGameObject(gameObject, timePassed) {
-        const pathPassed = this.UNIT_SIZE * gameObject.speed * (timePassed / 1000);
+        const pathPassed = this.UNIT_SIZE * gameObject.getSpeed() * (timePassed / 1000);
 
         if (pathPassed) {
             const pathX = pathPassed * Math.cos(gameObject.angle);
@@ -407,8 +415,9 @@ class PhysicsEngine {
             gameObject.y += pathY;
         }
 
-        if (gameObject.rotateSpeed) {
-            const anglePassed = 2 * Math.PI * gameObject.rotateSpeed * timePassed / 1000;
+        const rotateSpeed = gameObject.getRotateSpeed();
+        if (rotateSpeed) {
+            const anglePassed = 2 * Math.PI * rotateSpeed * timePassed / 1000;
             gameObject.angle += anglePassed;
         }
 
@@ -571,13 +580,34 @@ class Ship {
     constructor(x, y, angle) {
         this.width = 60;
         this.height = 60;
-        this.maxSpeed = 20; // Скорость движения: 20 юнитов в секунду
+
+        this.maxSpeed = 50; // Скорость движения: 50 юнитов в секунду
+        this.acceleration = 0;
+        this.maxAcceleration = 0.0005;
+        this.accelerationTurnedOnAt = null;
+
         this.maxRotateSpeed = 0.25; // Скорость разворота: 0.25 оборота в секунду
+
         this.shootsPerSecond = 5; // Скорострельность: 5 выстрелов в секунду
         this.missleLaunchedAt = null;
 
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, 0, 0);
         this.drawItem = new Sprite(imageManager.get('ship'), this.width, this.height, this.gameObject);
+
+        this.gameObject.getSpeed = () => {
+            if (this.accelerationTurnedOnAt) {
+                const now = new Date().getTime();
+                const newSpeed = this.gameObject.speed + this.acceleration * (now - this.accelerationTurnedOnAt);
+                this.gameObject.speed = newSpeed
+                if (this.gameObject.speed > this.maxSpeed) this.gameObject.speed = this.maxSpeed;
+                if (this.gameObject.speed < 0) this.gameObject.speed = 0;
+            }
+            return this.gameObject.speed;
+        }
+
+        this.gameObject.getRotateSpeed = () => {
+            return this.gameObject.rotateSpeed;
+        }
     }
 
     getDrawItem() {
@@ -597,6 +627,32 @@ class Ship {
         } else {
             return null;
         }
+    }
+
+    turnEngineOn() {
+        if (this.acceleration <= 0) {
+            this.accelerationTurnedOnAt = new Date().getTime();
+        }
+        this.acceleration = this.maxAcceleration;
+    }
+
+    turnEngineOff() {
+        if (this.acceleration > 0) {
+            this.accelerationTurnedOnAt = new Date().getTime();
+        }
+        this.acceleration = -this.maxAcceleration;
+    }
+
+    turnRotationLeftOn() {
+        this.getGameObject().rotateSpeed = -this.maxRotateSpeed;
+    }
+
+    turnRotationRightOn() {
+        this.getGameObject().rotateSpeed = this.maxRotateSpeed;
+    }
+
+    turnRotationOff() {
+        this.getGameObject().rotateSpeed = 0;
     }
 }
 
@@ -750,18 +806,18 @@ class Game {
         const k = this.keys.state;
         // Rotate
         if (k.ArrowLeft && !k.ArrowRight) {
-            this.ship.getGameObject().rotateSpeed = -this.ship.maxRotateSpeed;
+            this.ship.turnRotationLeftOn();
         } else if (!k.ArrowLeft && k.ArrowRight) {
-            this.ship.getGameObject().rotateSpeed = +this.ship.maxRotateSpeed;
+            this.ship.turnRotationRightOn();
         } else {
-            this.ship.getGameObject().rotateSpeed = 0;
+            this.ship.turnRotationOff();
         }
 
         // Move
         if (k.ArrowUp) {
-            this.ship.getGameObject().speed = this.ship.maxSpeed;
+            this.ship.turnEngineOn();
         } else {
-            this.ship.getGameObject().speed = 0;
+            this.ship.turnEngineOff();
         }
 
         // Shoot
