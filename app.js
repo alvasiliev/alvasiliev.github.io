@@ -250,12 +250,12 @@ class SplashScreen {
             context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
 
             context.font = "16px 'Courier New', Courier, monospace";
-            context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
-            context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
-            context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
-            context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-            context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
-            context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 170);
+            context.fillText("Arrow " + String.fromCharCode(8593) + "   - move", textLeft, this.height / 2 - 9 + 70);
+            context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
+            context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
+            context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
+            context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
+            context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
         }
     }
 }
@@ -284,12 +284,12 @@ class PauseScreen {
         context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
 
         context.font = "16px 'Courier New', Courier, monospace";
-        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
-        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
-        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
-        context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("Arrow " + String.fromCharCode(8593) + "   - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
     }
 }
 
@@ -317,12 +317,12 @@ class GameOverScreen {
         context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
 
         context.font = "16px 'Courier New', Courier, monospace";
-        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
-        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
-        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
-        context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("Arrow " + String.fromCharCode(8593) + "   - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
     }
 }
 
@@ -350,12 +350,12 @@ class WinnerScreen {
         context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
 
         context.font = "16px 'Courier New', Courier, monospace";
-        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
-        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
-        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
-        context.fillText("Right CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("Arrow " + String.fromCharCode(8593) + "   - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
     }
 }
 
