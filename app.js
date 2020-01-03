@@ -185,6 +185,7 @@ class SoundManager {
             'explosion',
             'shot',
             'jet',
+            'music',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
@@ -920,6 +921,8 @@ class Game {
         this.physicsEngine = new PhysicsEngine(this.width, this.height, this.figures);
         this.collisionEngine = new CollisionEngine(this.figures);
 
+        this.musicSound = null;
+
         this.renderEngine.drawSplashScreen(true);
         imageManager.onLoadFinished = () => {
             if (imageManager.isLoaded && soundManager.isLoaded) this.loadFinished();
@@ -960,6 +963,7 @@ class Game {
                 }
                 this.isFinished = true;
                 this.renderEngine.drawSplashScreen();
+                this.stopMusic();
             }
         }.bind(this));
     }
@@ -1080,6 +1084,7 @@ class Game {
         this.intervalHandle = null;
         this.renderEngine.drawGameOverScreen();
         if (this.ship) this.ship.dispose();
+        this.stopMusic();
     }
 
     win() {
@@ -1088,6 +1093,7 @@ class Game {
         this.intervalHandle = null;
         this.renderEngine.drawWinnerScreen();
         if (this.ship) this.ship.dispose();
+        this.stopMusic();
     }
 
     start() {
@@ -1099,6 +1105,7 @@ class Game {
             this.isFinished = false;
             this.init();
         }
+        this.startMusic();
     }
 
     pause() {
@@ -1106,6 +1113,19 @@ class Game {
             clearInterval(this.intervalHandle);
             this.intervalHandle = null;
             this.renderEngine.drawPauseScreen();
+        }
+    }
+
+    startMusic() {
+        if (!this.musicSound) {
+            this.musicSound = soundManager.get('music');
+        }
+        this.musicSound.play(1, true, true);
+    }
+
+    stopMusic() {
+        if (this.musicSound) {
+            this.musicSound.stop();
         }
     }
 }
