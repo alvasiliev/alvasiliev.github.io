@@ -128,6 +128,73 @@ class AnimatedSprite {
 
 // Engines
 
+class Sound {
+    constructor(context, buffer) {
+        this.context = context;
+        this.buffer = buffer;
+    }
+
+    play() {
+        const gainNode = this.context.createGain();
+
+        const source = this.context.createBufferSource();
+        source.buffer = this.buffer;
+        source.connect(gainNode);
+
+        gainNode.connect(this.context.destination);
+
+        source.start(this.context.currentTime);
+    }
+}
+
+class SoundManager {
+    constructor() {
+        this.context = new(window.AudioContext || window.webkitAudioContext)();
+
+        this.sounds = {};
+        this.loadedCount = 0;
+        this.sndList = [
+            'success',
+            'gameover',
+            'explosion',
+            'shot',
+        ];
+        this.onLoadFinished = null;
+        this.isLoaded = false;
+    }
+
+    async load() {
+        const promises = this.sndList.map(snd => this.loadSound(snd));
+
+        await Promise.all(promises)
+
+        this.isLoaded = true;
+        this.onLoadFinished();
+    }
+
+    get(soundName) {
+        return this.sounds[soundName] || {
+            play: function () {}
+        };
+    }
+
+    async loadSound(sndSrc) {
+        const url = `audio/${sndSrc}.mp3`;
+        try {
+            const response = await fetch(url);
+            if (response.ok) {
+                const audioData = await response.arrayBuffer();
+                const decodedData = await this.context.decodeAudioData(audioData);
+                this.sounds[sndSrc] = new Sound(this.context, decodedData);
+            } else {
+                console.error('Failed to load sound: ' + sndSrc);
+            }
+        } catch (e) {
+            console.error('Failed to load sound: ' + sndSrc);
+        }
+    }
+}
+
 class ImageManager {
     constructor() {
         this.images = {}
@@ -144,6 +211,7 @@ class ImageManager {
             'explosion',
         ];
         this.onLoadFinished = null;
+        this.isLoaded = false;
     }
 
     load() {
@@ -162,6 +230,7 @@ class ImageManager {
             this.loadedCount += 1;
 
             if (this.loadedCount === this.imgList.length && this.onLoadFinished) {
+                this.isLoaded = true;
                 this.onLoadFinished();
             }
         }
@@ -323,6 +392,8 @@ class GameOverScreen {
         context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
         context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
         context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
+
+        soundManager.get('gameover').play();
     }
 }
 
@@ -356,6 +427,8 @@ class WinnerScreen {
         context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
         context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
         context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
+
+        soundManager.get('success').play();
     }
 }
 
@@ -511,22 +584,20 @@ class CollisionEngine {
     checkMissleCollisions() {
         const missles = this.figures.get().filter(f => f instanceof Missle && !f.getGameObject().getIsDestroyed());
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
-        const newAsteroids = [];
+        const wreckles = [];
 
         for (let a of asteroids) {
             for (let m of missles) {
                 const isCollision = this.checkCollision(m, a);
                 if (isCollision) {
-                    m.getGameObject().destroy();
-                    const wreckles = this.blowUpAsteroid(a);
-                    if (wreckles.length) {
-                        newAsteroids.push(...wreckles);
-                    }
+                    m.blowUp();
+                    const wrecklesA = a.blowUp();
+                    if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
                 }
             }
         }
 
-        return newAsteroids;
+        return wreckles;
     }
 
     checkCollision(go1, go2) {
@@ -546,29 +617,6 @@ class CollisionEngine {
         const distance2 = dx * dx + dy * dy;
 
         return distance2 < minDistance2;
-    }
-
-    blowUpAsteroid(a) {
-        a.getGameObject().destroy();
-
-        const wreckles = [];
-
-        const x = a.getGameObject().x;
-        const y = a.getGameObject().y;
-        wreckles.push(new Explosion(x, y, a.radius * 2));
-
-        if (a.radius > 20) {
-            const wreckleRadius = a.radius / 3;
-            const wreckleSpeed = a.speed * 1.5;
-
-            const spinSpeed = a.getGameObject().spinSpeed * 2;
-
-            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
-            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
-            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
-        }
-
-        return wreckles;
     }
 }
 
@@ -670,6 +718,7 @@ class Ship {
         const timeout = 1000 / this.shootsPerSecond;
         if (this.missleLaunchedAt == null || this.missleLaunchedAt + timeout < now) {
             this.missleLaunchedAt = now;
+            soundManager.get('shot').play();
             return new Missle(this.gameObject.x, this.gameObject.y, this.gameObject.angle);
         } else {
             return null;
@@ -719,6 +768,10 @@ class Missle {
     getGameObject() {
         return this.gameObject;
     }
+
+    blowUp() {
+        this.getGameObject().destroy();
+    }
 }
 
 class Asteroid {
@@ -737,6 +790,30 @@ class Asteroid {
 
     getGameObject() {
         return this.gameObject;
+    }
+
+    blowUp() {
+        this.getGameObject().destroy();
+        soundManager.get('explosion').play();
+
+        const wreckles = [];
+
+        const x = this.getGameObject().x;
+        const y = this.getGameObject().y;
+        wreckles.push(new Explosion(x, y, this.radius * 2));
+
+        if (this.radius > 20) {
+            const wreckleRadius = this.radius / 3;
+            const wreckleSpeed = this.speed * 1.5;
+
+            const spinSpeed = this.getGameObject().spinSpeed * 2;
+
+            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
+            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
+            wreckles.push(new Asteroid(x, y, Math.random() * 360 * Math.PI / 180, wreckleRadius, wreckleSpeed, spinSpeed));
+        }
+
+        return wreckles;
     }
 }
 
@@ -766,7 +843,7 @@ class Explosion {
 // Game
 
 class Game {
-    constructor(imageManager) {
+    constructor(imageManager, soundManager) {
         this.intervalHandle = null;
         this.calcFrequency = 60; // 60 раз в секунду
         this.isFinished = false;
@@ -782,13 +859,23 @@ class Game {
 
         this.renderEngine.drawSplashScreen(true);
         imageManager.onLoadFinished = () => {
-            this.background = new Background(this.width, this.height);
-            this.init();
-            this.renderEngine.drawSplashScreen(false);
+            if (imageManager.isLoaded && soundManager.isLoaded) this.loadFinished();
         }
-        setTimeout(() => imageManager.load(), 200);
+        soundManager.onLoadFinished = () => {
+            if (imageManager.isLoaded && soundManager.isLoaded) this.loadFinished();
+        }
+        setTimeout(() => {
+            imageManager.load();
+            soundManager.load();
+        }, 200);
 
         this.configureKeys();
+    }
+
+    loadFinished() {
+        this.background = new Background(this.width, this.height);
+        this.init();
+        this.renderEngine.drawSplashScreen(false);
     }
 
     configureKeys() {
@@ -961,4 +1048,5 @@ class Game {
 // Initialization
 
 const imageManager = new ImageManager();
-const game = new Game(imageManager);
+const soundManager = new SoundManager();
+const game = new Game(imageManager, soundManager);
