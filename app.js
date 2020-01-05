@@ -211,6 +211,8 @@ class SoundManager {
             'shot',
             'jet',
             'music',
+            'dock',
+            'undock',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
@@ -1003,6 +1005,8 @@ class Station {
         this.drawItem = new CombinedDrawItem([this.drawItem1]);
 
         this.dockedShip = null;
+        this.dockSound = null;
+        this.undockSound = null;
     }
 
     getDrawItem() {
@@ -1041,11 +1045,27 @@ class Station {
     }
 
     dockShip(ship) {
-        this.dockedShip = ship;
+        if (!this.dockedShip) {
+            this.dockedShip = ship;
+            this.playDockSound();
+        }
     }
 
     undockShip() {
-        this.dockedShip = null;
+        if (this.dockedShip) {
+            this.dockedShip = null;
+            this.playUnockSound();
+        }
+    }
+
+    playDockSound() {
+        if (!this.dockSound) this.dockSound = soundManager.get('dock');
+        this.dockSound.play();
+    }
+
+    playUnockSound() {
+        if (!this.undockSound) this.undockSound = soundManager.get('undock');
+        this.undockSound.play();
     }
 }
 
