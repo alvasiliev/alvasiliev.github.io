@@ -84,6 +84,21 @@ class Circle {
     }
 }
 
+class Ring {
+    constructor(radius, color, position) {
+        this.radius = radius;
+        this.color = color;
+        this.position = position;
+    }
+
+    draw(context) {
+        context.strokeStyle = this.color;
+        context.beginPath();
+        context.arc(this.position.x, this.position.y, this.radius, 0, 2 * Math.PI, false);
+        context.stroke();
+    }
+}
+
 class AnimatedSprite {
     constructor(image, width, height, imageWidth, imageHeight, position, numFramesX, numFramesY, looped, onFinishedHandler) {
         this.position = position;
@@ -123,6 +138,16 @@ class AnimatedSprite {
         context.restore();
 
         this.frameNumber += 1;
+    }
+}
+
+class CombinedDrawItem {
+    constructor(drawItems) {
+        this.drawItems = drawItems;
+    }
+
+    draw(context) {
+        this.drawItems.forEach(di => di.draw(context));
     }
 }
 
@@ -358,8 +383,9 @@ class SplashScreen {
             context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
             context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
             context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-            context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
-            context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
+            context.fillText("Key Z     - connect to station", textLeft, this.height / 2 - 9 + 150);
+            context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 170);
+            context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 190);
         }
     }
 }
@@ -392,8 +418,9 @@ class PauseScreen {
         context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
         context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
         context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("Key Z     - connect to station", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 190);
     }
 }
 
@@ -426,8 +453,9 @@ class GameOverScreen {
         context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
         context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
         context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("Key Z     - connect to station", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 190);
 
         this.playSound();
     }
@@ -467,8 +495,9 @@ class WinnerScreen {
         context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
         context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
         context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("Key Z     - connect to station", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 190);
 
         this.playSound();
     }
@@ -664,6 +693,18 @@ class CollisionEngine {
         return wreckles;
     }
 
+    checkCanConnect() {
+        const ship = this.figures.get().find(f => f instanceof Ship);
+        const stations = this.figures.get().filter(f => f instanceof Station && !f.getGameObject().getIsDestroyed());
+
+        for (let s of stations) {
+            if (s.checkCanConnect(ship)) {
+                return s;
+            }
+        }
+        return null;
+    }
+
     checkCollision(go1, go2) {
         const go1Radius = go1.getGameObject().width / 2;
         const go1X = go1.getGameObject().x;
@@ -753,6 +794,8 @@ class Ship {
         this.missleLaunchedAt = null;
         this.missleSound = null;
 
+        this.connectedStation = null;
+
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, 0, 0);
         this.drawItem = new Sprite(imageManager.get('ship'), this.width, this.height, this.gameObject);
 
@@ -793,14 +836,14 @@ class Ship {
             if (!this.missleSound) this.missleSound = soundManager.get('shot');
             this.missleSound.play(0.1);
 
-            return new Missle(this.gameObject.x, this.gameObject.y, this.gameObject.angle);
+            return new Missle(this.gameObject.x, this.gameObject.y, this.gameObject.angle + this.gameObject.spinAngle);
         } else {
             return null;
         }
     }
 
     turnEngineOn() {
-        if (!this.isEngineOn) {
+        if (!this.isEngineOn && !this.getIsConnectedToStation()) {
             this.isEngineOn = true;
             this.accelerationTurnedOnAt = new Date().getTime();
             this.acceleration = this.maxAcceleration;
@@ -828,6 +871,34 @@ class Ship {
 
     turnRotationOff() {
         this.getGameObject().rotateSpeed = 0;
+    }
+
+    getIsConnectedToStation() {
+        return this.connectedStation != null;
+    }
+
+    connectToStation(station) {
+        if (station != null) {
+            this.connectedStation = station;
+            station.connectShip(this);
+
+            this.getGameObject().speed = 0;
+            this.getGameObject().spinSpeed = station.getGameObject().spinSpeed;
+            this.getGameObject().x = station.getGameObject().x;
+            this.getGameObject().y = station.getGameObject().y;
+        }
+    }
+
+    disconnectFromStation() {
+        if (this.getIsConnectedToStation()) {
+            this.connectedStation.disconnectShip();
+            this.connectedStation = null;
+
+            const go = this.getGameObject();
+            go.angle += go.spinAngle;
+            go.spinAngle = 0;
+            go.spinSpeed = 0;
+        }
     }
 }
 
@@ -927,7 +998,11 @@ class Station {
         this.width = 240;
         this.height = 240;
         this.gameObject = new GameObject(x, y, this.width, this.height, 0, 0, 0, false, 0.01);
-        this.drawItem = new Sprite(imageManager.get('station'), this.width, this.height, this.gameObject);
+        this.drawItem1 = new Sprite(imageManager.get('station'), this.width, this.height, this.gameObject);
+        this.drawItem2 = new Ring(30, '#0f0', this.gameObject);
+        this.drawItem = new CombinedDrawItem([this.drawItem1]);
+
+        this.connectedShip = null;
     }
 
     getDrawItem() {
@@ -936,6 +1011,41 @@ class Station {
 
     getGameObject() {
         return this.gameObject;
+    }
+
+    showCanConnect(canConnect) {
+        if (canConnect) {
+            this.drawItem.drawItems = [this.drawItem1, this.drawItem2];
+        } else {
+            this.drawItem.drawItems = [this.drawItem1];
+        }
+    }
+
+    checkCanConnect(ship) {
+        if (this.connectedShip != null) {
+            this.showCanConnect(false);
+            return false;
+        }
+
+        const shipPos = ship.getGameObject();
+        const stationPos = this.getGameObject();
+
+        const dx = shipPos.x - stationPos.x;
+        const dy = shipPos.y - stationPos.y;
+        const connectRadius = 30;
+
+        const canConnect = dx * dx + dy * dy <= connectRadius * connectRadius;
+
+        this.showCanConnect(canConnect);
+        return canConnect;
+    }
+
+    connectShip(ship) {
+        this.connectedShip = ship;
+    }
+
+    disconnectShip() {
+        this.connectedShip = null;
     }
 }
 
@@ -957,6 +1067,8 @@ class Game {
         this.collisionEngine = new CollisionEngine(this.figures);
 
         this.musicSound = null;
+
+        this.stationToConnect = null;
 
         this.renderEngine.drawSplashScreen(true);
         imageManager.onLoadFinished = () => {
@@ -986,6 +1098,12 @@ class Game {
                     this.start();
                 } else {
                     this.pause();
+                }
+            } else if (event.code === 'KeyZ') {
+                if (this.ship.getIsConnectedToStation()) {
+                    this.ship.disconnectFromStation();
+                } else if (this.stationToConnect) {
+                    this.ship.connectToStation(this.stationToConnect);
                 }
             }
         }.bind(this));
@@ -1130,6 +1248,8 @@ class Game {
                 this.win();
             }
         }
+
+        this.stationToConnect = this.collisionEngine.checkCanConnect();
     }
 
     loose() {
