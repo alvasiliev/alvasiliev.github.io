@@ -243,6 +243,7 @@ class ImageManager {
             'missle',
             'asteroid',
             'explosion',
+            'station',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
@@ -646,6 +647,23 @@ class CollisionEngine {
         return wreckles;
     }
 
+    checkStationsCollisions() {
+        const stations = this.figures.get().filter(f => f instanceof Station && !f.getGameObject().getIsDestroyed());
+        const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
+        const wreckles = [];
+
+        for (let a of asteroids) {
+            for (let s of stations) {
+                const isCollision = this.checkCollision(s, a);
+                if (isCollision) {
+                    const wrecklesA = a.blowUp();
+                    if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
+                }
+            }
+        }
+        return wreckles;
+    }
+
     checkCollision(go1, go2) {
         const go1Radius = go1.getGameObject().width / 2;
         const go1X = go1.getGameObject().x;
@@ -904,10 +922,27 @@ class Explosion {
     }
 }
 
+class Station {
+    constructor(x, y) {
+        this.width = 240;
+        this.height = 240;
+        this.gameObject = new GameObject(x, y, this.width, this.height, 0, 0, 0, false, 0.01);
+        this.drawItem = new Sprite(imageManager.get('station'), this.width, this.height, this.gameObject);
+    }
+
+    getDrawItem() {
+        return this.drawItem;
+    }
+
+    getGameObject() {
+        return this.gameObject;
+    }
+}
+
 // Game
 
 class Game {
-    constructor(imageManager, soundManager) {
+    constructor(imageManager, soundManager, w, h) {
         this.intervalHandle = null;
         this.calcFrequency = 60; // 60 раз в секунду
         this.isFinished = false;
@@ -915,8 +950,8 @@ class Game {
         this.keys = new Keys();
         this.figures = new Figures();
 
-        this.width = 1024;
-        this.height = 768;
+        this.width = w || 1024;
+        this.height = h || 768;
         this.renderEngine = new RenderEngine(this.width, this.height, this.figures);
         this.physicsEngine = new PhysicsEngine(this.width, this.height, this.figures);
         this.collisionEngine = new CollisionEngine(this.figures);
@@ -972,10 +1007,13 @@ class Game {
         this.background.getDrawItem().color = '#78f';
         this.figures.set([]);
 
-        this.ship = new Ship(this.width / 2, this.height / 2, 0);
+        this.ship = new Ship(this.width / 2 + 250, this.height / 2, 0);
 
         const asteroids = this.generateAsteroids();
+        const stations = this.generateStations();
+
         this.addFigure(this.background);
+        stations.forEach(s => this.addFigure(s));
         this.addFigure(this.ship);
         asteroids.forEach(a => this.addFigure(a));
 
@@ -1022,6 +1060,17 @@ class Game {
         return asteroids;
     }
 
+    generateStations() {
+        const stations = [];
+
+        const x = this.width / 2;
+        const y = this.height / 2;
+        const s = new Station(x, y);
+        stations.push(s);
+
+        return stations;
+    }
+
     addFigure(f) {
         this.figures.add(f);
     }
@@ -1060,6 +1109,11 @@ class Game {
 
         const newAsteriods = this.collisionEngine.checkMissleCollisions();
         for (let a of newAsteriods) {
+            this.addFigure(a);
+        }
+
+        const newAsteriods2 = this.collisionEngine.checkStationsCollisions();
+        for (let a of newAsteriods2) {
             this.addFigure(a);
         }
 
@@ -1132,6 +1186,8 @@ class Game {
 
 // Initialization
 
+const w = window.innerWidth,
+    h = window.innerHeight;
 const imageManager = new ImageManager();
 const soundManager = new SoundManager();
-const game = new Game(imageManager, soundManager);
+const game = new Game(imageManager, soundManager, w, h);
