@@ -57,15 +57,17 @@ class Sprite {
 }
 
 class Rect {
-    constructor(width, height, color) {
+    constructor(width, height, color, leftX, topY) {
         this.width = width;
         this.height = height;
         this.color = color;
+        this.leftX = leftX || 0;
+        this.topY = topY || 0;
     }
 
     draw(context) {
         context.fillStyle = this.color;
-        context.fillRect(0, 0, this.width, this.height);
+        context.fillRect(this.leftX, this.topY, this.width, this.height);
     }
 }
 
@@ -511,10 +513,11 @@ class WinnerScreen {
 }
 
 class RenderEngine {
-    constructor(viewportWidth, viewportHeight, figures) {
+    constructor(viewportWidth, viewportHeight, figures, statusPanel) {
         this.figures = figures;
         this.width = viewportWidth;
         this.height = viewportHeight;
+        this.statusPanel = statusPanel;
 
         const canvas = document.createElement('canvas');
         canvas.width = viewportWidth;
@@ -554,6 +557,7 @@ class RenderEngine {
                 f.getDrawItem().draw(this.context);
             }
         }
+        if (this.statusPanel) this.statusPanel.getDrawItem().draw(this.context);
         this.drawFps();
     }
 
@@ -568,8 +572,8 @@ class RenderEngine {
         }
 
         this.context.fillStyle = '#888';
-        this.context.font = "14px serif";
-        this.context.fillText("fps: " + this.fps.toFixed(1), this.width - 60, 20);
+        this.context.font = "14px 'Courier New', Courier, monospace";
+        this.context.fillText("fps: " + this.fps.toFixed(1), this.width - 80, 20);
     }
 }
 
@@ -649,14 +653,22 @@ class CollisionEngine {
     checkShipCollisions() {
         const ship = this.figures.get().find(f => f instanceof Ship);
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
+        const wreckles = [];
 
         for (let a of asteroids) {
             if (!a.getGameObject().getIsDestroyed()) {
                 const isCollision = this.checkCollision(ship, a);
-                if (isCollision) return true;
+                if (isCollision) {
+                    const wrecklesA = a.blowUp();
+                    if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
+                    ship.health -= a.getDamage();
+                    if (ship.health <= 0) {
+                        ship.health = 0;
+                    }
+                }
             }
         }
-        return false;
+        return wreckles;
     }
 
     checkMissleCollisions() {
@@ -689,6 +701,12 @@ class CollisionEngine {
                 if (isCollision) {
                     const wrecklesA = a.blowUp();
                     if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
+                    s.health -= a.getDamage();
+                    if (s.health <= 0) {
+                        s.health = 0;
+                        const wrecklesS = s.blowUp();
+                        if (wrecklesS && wrecklesS.length) wreckles.push(...wrecklesS);
+                    }
                 }
             }
         }
@@ -795,6 +813,9 @@ class Ship {
         this.shootsPerSecond = 5; // Скорострельность: 5 выстрелов в секунду
         this.missleLaunchedAt = null;
         this.missleSound = null;
+
+        this.maxHealth = 100;
+        this.health = 100;
 
         this.dockedStation = null;
 
@@ -933,7 +954,21 @@ class Asteroid {
         this.height = radius * 2;
         this.speed = speed;
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, false, spinSpeed);
-        this.drawItem = new Sprite(imageManager.get('asteroid'), this.width, this.height, this.gameObject);
+        this.drawItemSprite = new Sprite(imageManager.get('asteroid'), this.width, this.height, this.gameObject);
+        this.drawItemDamage = {
+            draw: context => {
+                const originalTextAlign = context.textAlign;
+                context.textAlign = 'center';
+                context.fillStyle = '#888';
+                context.font = "10px  'Courier New', Courier, monospace";
+                context.fillText(this.getDamage(), this.gameObject.x, this.gameObject.y - radius - 3);
+                context.textAlign = originalTextAlign;
+            }
+        };
+        this.drawItem = new CombinedDrawItem([
+            this.drawItemSprite,
+            this.drawItemDamage,
+        ]);
         this.explosionSound = null;
     }
 
@@ -970,6 +1005,11 @@ class Asteroid {
 
         return wreckles;
     }
+
+    getDamage() {
+        const damage = Math.round(this.radius * this.radius * this.radius / 100);
+        return damage || 1;
+    }
 }
 
 class Explosion {
@@ -997,16 +1037,33 @@ class Explosion {
 
 class Station {
     constructor(x, y) {
-        this.width = 240;
-        this.height = 240;
+        this.radius = 120;
+        this.width = this.radius * 2;
+        this.height = this.radius * 2;
         this.gameObject = new GameObject(x, y, this.width, this.height, 0, 0, 0, false, 0.01);
-        this.drawItem1 = new Sprite(imageManager.get('station'), this.width, this.height, this.gameObject);
-        this.drawItem2 = new Ring(30, '#0f0', this.gameObject);
-        this.drawItem = new CombinedDrawItem([this.drawItem1]);
+        this.drawItemStation = new Sprite(imageManager.get('station'), this.width, this.height, this.gameObject);
+        this.drawItemRing = new Ring(30, '#0f0', this.gameObject);
+        this.drawItemHealth = {
+            draw: context => {
+                const originalTextAlign = context.textAlign;
+                context.textAlign = 'center';
+                context.fillStyle = '#888';
+                context.font = "10px  'Courier New', Courier, monospace";
+                context.fillText(`${this.health} / ${this.maxHealth}`, this.gameObject.x, this.gameObject.y - this.radius - 3);
+                context.textAlign = originalTextAlign;
+            }
+        };
+        this.drawItem = new CombinedDrawItem([
+            this.drawItemStation,
+            this.drawItemHealth,
+        ]);
 
         this.dockedShip = null;
         this.dockSound = null;
         this.undockSound = null;
+
+        this.maxHealth = 1000;
+        this.health = 1000;
     }
 
     getDrawItem() {
@@ -1019,9 +1076,9 @@ class Station {
 
     showCanDock(canDock) {
         if (canDock) {
-            this.drawItem.drawItems = [this.drawItem1, this.drawItem2];
+            this.drawItem.drawItems = [this.drawItemStation, this.drawItemHealth, this.drawItemRing];
         } else {
-            this.drawItem.drawItems = [this.drawItem1];
+            this.drawItem.drawItems = [this.drawItemStation, this.drawItemHealth];
         }
     }
 
@@ -1067,6 +1124,45 @@ class Station {
         if (!this.undockSound) this.undockSound = soundManager.get('undock');
         this.undockSound.play();
     }
+
+    blowUp() {
+        this.getGameObject().destroy();
+
+        if (!this.explosionSound) this.explosionSound = soundManager.get('explosion');
+        this.explosionSound.play();
+
+        const wreckles = [];
+
+        const x = this.getGameObject().x;
+        const y = this.getGameObject().y;
+        wreckles.push(new Explosion(x, y, this.radius * 2));
+
+        this.undockShip();
+
+        return wreckles;
+    }
+}
+
+class StatusPanel {
+    constructor(game) {
+        this.game = game;
+
+        this.shipHealth = {
+            draw: context => {
+                context.fillStyle = '#888';
+                context.font = "14px  'Courier New', Courier, monospace";
+                context.fillText(`Health: ${this.game.ship.health} / ${this.game.ship.maxHealth}`, 10, 20);
+            }
+        };
+
+        this.drawItem = new CombinedDrawItem([
+            this.shipHealth
+        ]);
+    }
+
+    getDrawItem() {
+        return this.drawItem;
+    }
 }
 
 // Game
@@ -1082,7 +1178,8 @@ class Game {
 
         this.width = w || 1024;
         this.height = h || 768;
-        this.renderEngine = new RenderEngine(this.width, this.height, this.figures);
+        this.statusPanel = new StatusPanel(this);
+        this.renderEngine = new RenderEngine(this.width, this.height, this.figures, this.statusPanel);
         this.physicsEngine = new PhysicsEngine(this.width, this.height, this.figures);
         this.collisionEngine = new CollisionEngine(this.figures);
 
@@ -1259,8 +1356,12 @@ class Game {
         const figuresWithoutDestroyed = this.figures.get().filter(f => !f.getGameObject || !f.getGameObject().getIsDestroyed());
         this.figures.set(figuresWithoutDestroyed);
 
-        const isShipCollision = this.collisionEngine.checkShipCollisions();
-        if (isShipCollision) {
+        const newAsteriods3 = this.collisionEngine.checkShipCollisions();
+        for (let a of newAsteriods3) {
+            this.addFigure(a);
+        }
+
+        if (this.ship.health <= 0) {
             this.loose();
         } else {
             const asteroids = this.figures.get().filter(f => f instanceof Asteroid);
