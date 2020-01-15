@@ -269,7 +269,7 @@ class ImageManager {
             'cloud_small',
             'cloud_large',
             'ship',
-            'missle',
+            'bullet',
             'asteroid',
             'explosion',
             'station',
@@ -671,13 +671,13 @@ class CollisionEngine {
         return wreckles;
     }
 
-    checkMissleCollisions() {
-        const missles = this.figures.get().filter(f => f instanceof Missle && !f.getGameObject().getIsDestroyed());
+    checkBulletCollisions() {
+        const bullets = this.figures.get().filter(f => f instanceof Bullet && !f.getGameObject().getIsDestroyed());
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
         const wreckles = [];
 
         for (let a of asteroids) {
-            for (let m of missles) {
+            for (let m of bullets) {
                 const isCollision = this.checkCollision(m, a);
                 if (isCollision) {
                     m.blowUp();
@@ -811,8 +811,8 @@ class Ship {
         this.maxRotateSpeed = 0.25; // Скорость разворота: 0.25 оборота в секунду
 
         this.shootsPerSecond = 5; // Скорострельность: 5 выстрелов в секунду
-        this.missleLaunchedAt = null;
-        this.missleSound = null;
+        this.shotAt = null;
+        this.shotSound = null;
 
         this.maxHealth = 100;
         this.health = 100;
@@ -852,18 +852,18 @@ class Ship {
         return this.gameObject;
     }
 
-    launchMissle() {
+    shoot() {
         if (this.ammo <= 0) return null;
         const now = new Date().getTime();
         const timeout = 1000 / this.shootsPerSecond;
-        if (this.missleLaunchedAt == null || this.missleLaunchedAt + timeout < now) {
-            this.missleLaunchedAt = now;
+        if (this.shotAt == null || this.shotAt + timeout < now) {
+            this.shotAt = now;
 
-            if (!this.missleSound) this.missleSound = soundManager.get('shot');
-            this.missleSound.play(0.1);
+            if (!this.shotSound) this.shotSound = soundManager.get('shot');
+            this.shotSound.play(0.1);
 
             this.ammo -= 1;
-            return new Missle(this.gameObject.x, this.gameObject.y, this.gameObject.angle + this.gameObject.spinAngle);
+            return new Bullet(this.gameObject.x, this.gameObject.y, this.gameObject.angle + this.gameObject.spinAngle);
         } else {
             return null;
         }
@@ -929,13 +929,13 @@ class Ship {
     }
 }
 
-class Missle {
+class Bullet {
     constructor(x, y, angle) {
         this.width = 10;
         this.height = 10;
         this.speed = 100;
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, true);
-        this.drawItem = new Sprite(imageManager.get('missle'), this.width, this.height, this.gameObject);
+        this.drawItem = new Sprite(imageManager.get('bullet'), this.width, this.height, this.gameObject);
     }
 
     getDrawItem() {
@@ -1386,9 +1386,9 @@ class Game {
 
         // Shoot
         if (k.ControlLeft) {
-            const missle = this.ship.launchMissle();
-            if (missle) {
-                this.addFigure(missle);
+            const bullet = this.ship.shoot();
+            if (bullet) {
+                this.addFigure(bullet);
             }
         }
     }
@@ -1398,13 +1398,13 @@ class Game {
         this.physicsEngine.moveAll();
         this.renderEngine.drawFrame();
 
-        const newAsteriods = this.collisionEngine.checkMissleCollisions();
-        for (let a of newAsteriods) {
+        const newFigures1 = this.collisionEngine.checkBulletCollisions();
+        for (let a of newFigures1) {
             this.addFigure(a);
         }
 
-        const newAsteriods2 = this.collisionEngine.checkStationsCollisions();
-        for (let a of newAsteriods2) {
+        const newFigures2 = this.collisionEngine.checkStationsCollisions();
+        for (let a of newFigures2) {
             this.addFigure(a);
         }
 
@@ -1412,8 +1412,8 @@ class Game {
         const figuresWithoutDestroyed = this.figures.get().filter(f => !f.getGameObject || !f.getGameObject().getIsDestroyed());
         this.figures.set(figuresWithoutDestroyed);
 
-        const newAsteriods3 = this.collisionEngine.checkShipCollisions();
-        for (let a of newAsteriods3) {
+        const newFigures3 = this.collisionEngine.checkShipCollisions();
+        for (let a of newFigures3) {
             this.addFigure(a);
         }
 
