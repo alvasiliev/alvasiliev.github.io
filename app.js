@@ -816,6 +816,8 @@ class Ship {
 
         this.maxHealth = 100;
         this.health = 100;
+        this.maxAmmo = 30;
+        this.ammo = 30;
 
         this.dockedStation = null;
 
@@ -851,6 +853,7 @@ class Ship {
     }
 
     launchMissle() {
+        if (this.ammo <= 0) return null;
         const now = new Date().getTime();
         const timeout = 1000 / this.shootsPerSecond;
         if (this.missleLaunchedAt == null || this.missleLaunchedAt + timeout < now) {
@@ -859,6 +862,7 @@ class Ship {
             if (!this.missleSound) this.missleSound = soundManager.get('shot');
             this.missleSound.play(0.1);
 
+            this.ammo -= 1;
             return new Missle(this.gameObject.x, this.gameObject.y, this.gameObject.angle + this.gameObject.spinAngle);
         } else {
             return null;
@@ -1064,6 +1068,9 @@ class Station {
 
         this.maxHealth = 1000;
         this.health = 1000;
+
+        this.ammoLoadsPerSecond = 2;
+        this.ammoLoadedAt = null;
     }
 
     getDrawItem() {
@@ -1141,6 +1148,22 @@ class Station {
 
         return wreckles;
     }
+
+    loadAmmo() {
+        if (this.dockedShip) {
+            const now = new Date().getTime();
+            const timeout = 1000 / this.ammoLoadsPerSecond;
+            const timeToLoad = this.ammoLoadedAt == null || this.ammoLoadedAt + timeout < now;
+            if (this.dockedShip.ammo < this.dockedShip.maxAmmo && timeToLoad) {
+                this.ammoLoadedAt = now;
+                this.dockedShip.ammo += 1;
+            }
+        }
+    }
+
+    tick() {
+        this.loadAmmo();
+    }
 }
 
 class StatusPanel {
@@ -1155,8 +1178,41 @@ class StatusPanel {
             }
         };
 
+        this.shipAmmo = {
+            draw: context => {
+                context.fillStyle = '#888';
+                context.font = "14px  'Courier New', Courier, monospace";
+                context.fillText(`Ammo: ${this.game.ship.ammo} / ${this.game.ship.maxAmmo}`, 170, 20);
+            }
+        };
+
+        this.messages = {
+            draw: context => {
+                const msgs = [];
+                if (this.game.ship.ammo <= 0 && !this.game.ship.dockedStation) {
+                    msgs.push('OUT OF AMMO');
+                    msgs.push('Dock to station to charge');
+                }
+
+                const originalTextAlign = context.textAlign;
+                context.textAlign = 'center';
+                context.fillStyle = 'rgba(240,240,240,0.3)';
+                context.font = "36px  'Courier New', Courier, monospace";
+
+                let top = 80;
+                for (let m of msgs) {
+                    context.fillText(m, this.game.width / 2, top);
+                    top += 40;
+                }
+
+                context.textAlign = originalTextAlign;
+            }
+        };
+
         this.drawItem = new CombinedDrawItem([
-            this.shipHealth
+            this.shipHealth,
+            this.shipAmmo,
+            this.messages,
         ]);
     }
 
@@ -1371,6 +1427,7 @@ class Game {
         }
 
         this.stationToDock = this.collisionEngine.checkCanDock();
+        this.figures.get().filter(f => f.tick).forEach(f => f.tick());
     }
 
     loose() {
