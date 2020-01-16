@@ -277,6 +277,7 @@ class ImageManager {
             'cloud_small',
             'cloud_large',
             'ship',
+            'shipFire',
             'bullet',
             'asteroid',
             'explosion',
@@ -870,7 +871,12 @@ class Ship {
         this.dockedStation = null;
 
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, 0, 0);
-        this.drawItem = new Sprite(imageManager.get('ship'), this.width, this.height, this.gameObject);
+        this.drawItemShip = new Sprite(imageManager.get('ship'), this.width, this.height, this.gameObject);
+        this.drawItemShipFireLeft = new Sprite(imageManager.get('shipFire'), 10, 5, this.gameObject, -30, -19);
+        this.drawItemShipFireRight = new Sprite(imageManager.get('shipFire'), 10, 5, this.gameObject, -30, 19);
+        this.drawItem = new CombinedDrawItem([
+            this.drawItemShip,
+        ]);
 
         this.gameObject.getSpeed = () => {
             if (this.accelerationTurnedOnAt) {
@@ -941,6 +947,11 @@ class Ship {
             this.acceleration = this.maxAcceleration;
             this.engineSound = soundManager.get('jet'); // New each time. This sound is looped it has to be stopped on engine off
             this.engineSound.play(2, true, true);
+            this.drawItem.drawItems = [
+                this.drawItemShip,
+                this.drawItemShipFireLeft,
+                this.drawItemShipFireRight,
+            ];
         }
     }
 
@@ -950,6 +961,9 @@ class Ship {
             this.accelerationTurnedOnAt = new Date().getTime();
             this.acceleration = -this.maxAcceleration;
             if (this.engineSound) this.engineSound.stop();
+            this.drawItem.drawItems = [
+                this.drawItemShip,
+            ];
         }
     }
 
