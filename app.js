@@ -214,7 +214,7 @@ class SoundManager {
         this.sounds = {};
         this.loadedCount = 0;
         this.sndList = [
-            'success',
+            'victory',
             'gameover',
             'explosion',
             'shot',
@@ -489,7 +489,7 @@ class GameOverScreen {
     }
 }
 
-class WinnerScreen {
+class VictoryScreen {
     constructor(width, height) {
         this.width = width;
         this.height = height;
@@ -502,13 +502,16 @@ class WinnerScreen {
         this.background.draw(context);
         context.globalAlpha = 1;
 
+        const originalTextAlign = context.textAlign;
+        context.textAlign = 'center';
         context.fillStyle = '#ddd';
         context.font = "48px 'Courier New', Courier, monospace";
-        context.fillText("WELL DONE", this.width / 2 - 120, this.height / 2 - 50);
+        context.fillText("MISSION ACCOMPLISHED", this.width / 2, this.height / 2 - 50);
 
         context.fillStyle = '#aaa';
         context.font = "18px 'Courier New', Courier, monospace";
-        context.fillText("Press ENTER restart", this.width / 2 - 110, this.height / 2 - 9);
+        context.fillText("Press ENTER restart", this.width / 2, this.height / 2 - 9);
+        context.textAlign = originalTextAlign;
 
         const textLeft = this.width / 2 - 110;
         context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
@@ -527,7 +530,7 @@ class WinnerScreen {
     }
 
     playSound() {
-        if (!this.sound) this.sound = soundManager.get('success');
+        if (!this.sound) this.sound = soundManager.get('victory');
         this.sound.play();
     }
 }
@@ -566,8 +569,8 @@ class RenderEngine {
         screen.draw(this.context);
     }
 
-    drawWinnerScreen() {
-        const screen = new WinnerScreen(this.width, this.height);
+    drawVictoryScreen() {
+        const screen = new VictoryScreen(this.width, this.height);
         screen.draw(this.context);
     }
 
@@ -1696,7 +1699,7 @@ class Game {
         this.isFinished = true;
         clearInterval(this.intervalHandle);
         this.intervalHandle = null;
-        this.renderEngine.drawWinnerScreen();
+        this.renderEngine.drawVictoryScreen();
         if (this.ship) this.ship.dispose();
         this.stopMusic();
     }
