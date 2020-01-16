@@ -105,9 +105,9 @@ class Ring {
 }
 
 class AnimatedSprite {
-    constructor(image, width, height, imageWidth, imageHeight, position, numFramesX, numFramesY, looped, onFinishedHandler, deltaX, deltaY) {
+    constructor(image, width, height, imageWidth, imageHeight, position, numFramesX, numFramesY, looped, onFinishedHandler, deltaX, deltaY, startFrameNumber) {
         this.position = position;
-        this.frameNumber = 0;
+        this.frameNumber = startFrameNumber || 0;
         this.numFramesX = numFramesX;
         this.numFramesY = numFramesY;
         this.numFrames = numFramesX * numFramesY;
@@ -223,6 +223,7 @@ class SoundManager {
             'music',
             'dock',
             'undock',
+            'pickUp',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
@@ -284,6 +285,7 @@ class ImageManager {
             'station',
             'missile',
             'missileFire',
+            'beacon',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
@@ -689,12 +691,6 @@ class CollisionEngine {
         return wreckles;
     }
 
-    checkAmmoCollisions() {
-        const w1 = this.checkBulletCollisions();
-        const w2 = this.checkMissileCollisions();
-        return [...w1, ...w2];
-    }
-
     checkBulletCollisions() {
         const bullets = this.figures.get().filter(f => f instanceof Bullet && !f.getGameObject().getIsDestroyed());
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
@@ -756,6 +752,20 @@ class CollisionEngine {
         return wreckles;
     }
 
+    checkShipBeaconCollisions() {
+        const ship = this.figures.get().find(f => f instanceof Ship);
+        const beacons = this.figures.get().filter(f => f instanceof Beacon && !f.getGameObject().getIsDestroyed());
+
+        for (let b of beacons) {
+            if (!b.getGameObject().getIsDestroyed()) {
+                const isCollision = this.checkCollision(ship, b);
+                if (isCollision) {
+                    ship.gatherBeacon(b);
+                }
+            }
+        }
+    }
+
     checkCanDock() {
         const ship = this.figures.get().find(f => f instanceof Ship);
         const stations = this.figures.get().filter(f => f instanceof Station && !f.getGameObject().getIsDestroyed());
@@ -785,6 +795,20 @@ class CollisionEngine {
         const distance2 = dx * dx + dy * dy;
 
         return distance2 < minDistance2;
+    }
+
+    checkAllCollisions() {
+        const newFigures1 = this.checkBulletCollisions();
+        const newFigures2 = this.checkMissileCollisions();
+        const newFigures3 = this.checkStationsCollisions();
+        const newFigures4 = this.checkShipCollisions();
+        this.checkShipBeaconCollisions();
+        return [
+            ...newFigures1,
+            ...newFigures2,
+            ...newFigures3,
+            ...newFigures4,
+        ];
     }
 }
 
@@ -872,6 +896,9 @@ class Ship {
 
         this.dockedStation = null;
 
+        this.beaconCount = 0;
+        this.pickUpSound = null;
+
         this.gameObject = new GameObject(x, y, this.width, this.height, angle, 0, 0);
         this.drawItemShip = new Sprite(imageManager.get('ship'), this.width, this.height, this.gameObject);
         this.drawItemShipFireLeft = new Sprite(imageManager.get('shipFire'), 10, 5, this.gameObject, -30, -19);
@@ -931,10 +958,6 @@ class Ship {
         const timeout = 1000 / this.missilesPerSecond;
         if (this.missileLaunchedAt == null || this.missileLaunchedAt + timeout < now) {
             this.missileLaunchedAt = now;
-
-            if (!this.missileSound) this.missileSound = soundManager.get('shot');
-            this.missileSound.play(0.1);
-
             this.missileCount -= 1;
             return new Missile(this.gameObject.x, this.gameObject.y, this.gameObject.angle + this.gameObject.spinAngle);
         } else {
@@ -1008,6 +1031,14 @@ class Ship {
             go.spinSpeed = 0;
         }
     }
+
+    gatherBeacon(beacon) {
+        this.beaconCount += 1;
+        beacon.getGameObject().destroy();
+
+        if (!this.pickUpSound) this.pickUpSound = soundManager.get('pickUp');
+        this.pickUpSound.play(0.4);
+    }
 }
 
 class Bullet {
@@ -1048,7 +1079,7 @@ class Missile {
         ]);
 
         this.missileSound = soundManager.get('missile'); // New each time. This sound is looped it has to be stopped on destroy
-        this.missileSound.play(2, true, true);
+        this.missileSound.play(0.5, true, true);
 
         this.gameObject.destroy = () => {
             this.gameObject.isDestroyed = true;
@@ -1336,6 +1367,14 @@ class StatusPanel {
             }
         };
 
+        this.shipBeacons = {
+            draw: context => {
+                context.fillStyle = '#888';
+                context.font = "14px  'Courier New', Courier, monospace";
+                context.fillText(`Beacons: ${this.game.ship.beaconCount} / ${this.game.totalBeaconCount}`, 440, 20);
+            }
+        };
+
         this.messages = {
             draw: context => {
                 const msgs = [];
@@ -1363,12 +1402,37 @@ class StatusPanel {
             this.shipHealth,
             this.shipAmmo,
             this.shipMissiles,
+            this.shipBeacons,
             this.messages,
         ]);
     }
 
     getDrawItem() {
         return this.drawItem;
+    }
+}
+
+class Beacon {
+    constructor(x, y, angle, speed) {
+        this.radius = 15;
+        this.width = this.radius * 2;
+        this.height = this.radius * 2;
+        this.speed = speed;
+        this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, false);
+
+        const startFrameNumber = Math.round(Math.random() * 100);
+        this.drawItemSprite = new AnimatedSprite(imageManager.get('beacon'), this.radius * 2, this.radius * 2, 30, 30, this.gameObject, 10, 10, true, null, 0, 0, startFrameNumber);
+        this.drawItem = new CombinedDrawItem([
+            this.drawItemSprite,
+        ]);
+    }
+
+    getDrawItem() {
+        return this.drawItem;
+    }
+
+    getGameObject() {
+        return this.gameObject;
     }
 }
 
@@ -1393,6 +1457,8 @@ class Game {
         this.musicSound = null;
 
         this.stationToDock = null;
+
+        this.totalBeaconCount = 3;
 
         this.renderEngine.drawSplashScreen(true);
         imageManager.onLoadFinished = () => {
@@ -1453,11 +1519,13 @@ class Game {
 
         const asteroids = this.generateAsteroids();
         const stations = this.generateStations();
+        const beacons = this.generateBeacons();
 
         this.addFigure(this.background);
         stations.forEach(s => this.addFigure(s));
         this.addFigure(this.ship);
         asteroids.forEach(a => this.addFigure(a));
+        beacons.forEach(b => this.addFigure(b));
 
         this.physicsEngine.reset();
     }
@@ -1513,6 +1581,39 @@ class Game {
         return stations;
     }
 
+    generateBeacons() {
+        const beacons = [];
+        const minSpeed = 1;
+        const maxSpeed = 20;
+        for (let i = 0; i < this.totalBeaconCount; ++i) {
+            const rand = Math.random();
+            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
+
+            const linearPos = Math.trunc((this.width + this.height) * 2 * Math.random());
+
+            let x, y;
+            if (linearPos < this.width) {
+                x = linearPos;
+                y = 0;
+            } else if (linearPos < this.width + this.height) {
+                x = this.width;
+                y = linearPos - this.width;
+            } else if (linearPos < this.width * 2 + this.height) {
+                x = linearPos - this.width - this.height;
+                y = this.height;
+            } else {
+                x = 0;
+                y = linearPos - this.width * 2 - this.height;
+            }
+
+            const angle = Math.random() * 360 * Math.PI / 180;
+
+            const b = new Beacon(x, y, angle, speed);
+            beacons.push(b);
+        }
+        return beacons;
+    }
+
     addFigure(f) {
         this.figures.add(f);
     }
@@ -1557,36 +1658,29 @@ class Game {
         this.physicsEngine.moveAll();
         this.renderEngine.drawFrame();
 
-        const newFigures1 = this.collisionEngine.checkAmmoCollisions();
-        for (let a of newFigures1) {
-            this.addFigure(a);
-        }
-
-        const newFigures2 = this.collisionEngine.checkStationsCollisions();
-        for (let a of newFigures2) {
-            this.addFigure(a);
+        const newFigures = this.collisionEngine.checkAllCollisions();
+        for (let f of newFigures) {
+            this.addFigure(f);
         }
 
         // Remove all destroyed objects
         const figuresWithoutDestroyed = this.figures.get().filter(f => !f.getGameObject || !f.getGameObject().getIsDestroyed());
         this.figures.set(figuresWithoutDestroyed);
 
-        const newFigures3 = this.collisionEngine.checkShipCollisions();
-        for (let a of newFigures3) {
-            this.addFigure(a);
-        }
-
-        if (this.ship.health <= 0) {
-            this.loose();
-        } else {
-            const asteroids = this.figures.get().filter(f => f instanceof Asteroid);
-            if (asteroids.length === 0) {
-                this.win();
-            }
-        }
+        this.checkGameResult();
 
         this.stationToDock = this.collisionEngine.checkCanDock();
         this.figures.get().filter(f => f.tick).forEach(f => f.tick());
+    }
+
+    checkGameResult() {
+        if (this.ship.health <= 0) {
+            this.loose();
+        } else {
+            if (this.ship.beaconCount === this.totalBeaconCount) {
+                this.win();
+            }
+        }
     }
 
     loose() {
