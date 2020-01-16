@@ -536,11 +536,11 @@ class VictoryScreen {
 }
 
 class RenderEngine {
-    constructor(viewportWidth, viewportHeight, figures, statusPanel) {
+    constructor(viewportWidth, viewportHeight, figures, userInterfaceItems) {
         this.figures = figures;
         this.width = viewportWidth;
         this.height = viewportHeight;
-        this.statusPanel = statusPanel;
+        this.userInterfaceItems = userInterfaceItems;
 
         const canvas = document.createElement('canvas');
         canvas.width = viewportWidth;
@@ -580,7 +580,9 @@ class RenderEngine {
                 f.getDrawItem().draw(this.context);
             }
         }
-        if (this.statusPanel) this.statusPanel.getDrawItem().draw(this.context);
+        if (this.userInterfaceItems) {
+            this.userInterfaceItems.forEach(ui => ui.getDrawItem().draw(this.context));
+        }
         this.drawFps();
     }
 
@@ -1415,6 +1417,50 @@ class StatusPanel {
     }
 }
 
+class MissionDescription {
+    constructor(game) {
+        this.descriptionItem = {
+            draw: context => {
+                if (!this.descriptionLines) return;
+
+                const originalTextAlign = context.textAlign;
+                context.textAlign = 'start';
+                context.fillStyle = 'rgba(240,240,240,0.5)';
+
+                const headerTop = game.height - 50 - 30 * this.descriptionLines.length;
+                context.font = "28px  'Courier New', Courier, monospace";
+                context.fillText('MISSION GOAL', 20, headerTop);
+
+                context.font = "22px  'Courier New', Courier, monospace";
+                let lineNum = 0
+                for (let m of this.descriptionLines) {
+                    const top = game.height - 20 - 30 * (this.descriptionLines.length - lineNum);
+                    context.fillText(m, 20, top);
+                    lineNum += 1;
+                }
+
+                context.textAlign = originalTextAlign;
+            }
+        };
+
+        this.drawItem = new CombinedDrawItem([
+            this.descriptionItem,
+        ]);
+    }
+
+    getDrawItem() {
+        return this.drawItem;
+    }
+
+    show(descriptionLines) {
+        this.descriptionLines = descriptionLines;
+    }
+
+    hide() {
+        this.descriptionLines = null
+    }
+}
+
 class Beacon {
     constructor(x, y, angle, speed) {
         this.radius = 15;
@@ -1445,7 +1491,7 @@ class Game {
     constructor(imageManager, soundManager, w, h) {
         this.intervalHandle = null;
         this.calcFrequency = 60; // 60 раз в секунду
-        this.isFinished = false;
+        this.isFinished = true;
 
         this.keys = new Keys();
         this.figures = new Figures();
@@ -1453,7 +1499,8 @@ class Game {
         this.width = w || 1024;
         this.height = h || 768;
         this.statusPanel = new StatusPanel(this);
-        this.renderEngine = new RenderEngine(this.width, this.height, this.figures, this.statusPanel);
+        this.missionDescription = new MissionDescription(this);
+        this.renderEngine = new RenderEngine(this.width, this.height, this.figures, [this.statusPanel, this.missionDescription]);
         this.physicsEngine = new PhysicsEngine(this.width, this.height, this.figures);
         this.collisionEngine = new CollisionEngine(this.figures);
 
@@ -1480,7 +1527,6 @@ class Game {
 
     loadFinished() {
         this.background = new Background(this.width, this.height);
-        this.init();
         this.renderEngine.drawSplashScreen(false);
     }
 
@@ -1713,8 +1759,20 @@ class Game {
         if (this.isFinished) {
             this.isFinished = false;
             this.init();
+            this.startMusic();
         }
-        this.startMusic();
+        this.showMissionDescription();
+    }
+
+    showMissionDescription() {
+        this.missionDescription.show([
+            'You mission is to gather all the beacons',
+            'Asteroids can hit both you and station',
+            'Protect the station - you can get ammo there',
+        ]);
+        setTimeout(() => {
+            this.missionDescription.hide();
+        }, 3000);
     }
 
     pause() {
