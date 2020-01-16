@@ -803,6 +803,7 @@ class Img {
 
 class Background {
     constructor(width, height) {
+        this.background = new Rect(width, height, '#0F065D');
         this.sprites = {
             space: new Img(width / 2, height / 2, 0, width, height, imageManager.get('space')),
             starsSmall: new Img(width / 2, height / 2, 0, width, height, imageManager.get('stars_small')),
@@ -825,6 +826,7 @@ class Background {
     }
 
     drawAll(context) {
+        this.background.draw(context);
         this.drawSprite(context, this.sprites.space);
         this.drawSprite(context, this.sprites.starsSmall);
         this.drawSprite(context, this.sprites.starsLarge);
