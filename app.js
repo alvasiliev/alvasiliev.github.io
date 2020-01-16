@@ -37,17 +37,20 @@ class GameObject {
 }
 
 class Sprite {
-    constructor(image, width, height, position) {
+    constructor(image, width, height, position, deltaX, deltaY) {
         this.width = width;
         this.height = height;
         this.position = position;
         this.image = image;
+        this.deltaX = deltaX || 0;
+        this.deltaY = deltaY || 0;
     }
 
     draw(context) {
         context.save();
         context.translate(this.position.x, this.position.y);
         context.rotate(this.position.angle + this.position.spinAngle);
+        context.translate(this.deltaX, this.deltaY);
         context.drawImage(
             this.image,
             -this.width / 2, -this.height / 2, this.width, this.height
@@ -102,7 +105,7 @@ class Ring {
 }
 
 class AnimatedSprite {
-    constructor(image, width, height, imageWidth, imageHeight, position, numFramesX, numFramesY, looped, onFinishedHandler) {
+    constructor(image, width, height, imageWidth, imageHeight, position, numFramesX, numFramesY, looped, onFinishedHandler, deltaX, deltaY) {
         this.position = position;
         this.frameNumber = 0;
         this.numFramesX = numFramesX;
@@ -115,6 +118,8 @@ class AnimatedSprite {
         this.imageHeight = imageHeight;
         this.looped = looped;
         this.onFinishedHandler = onFinishedHandler;
+        this.deltaX = deltaX || 0;
+        this.deltaY = deltaY || 0;
     }
 
     draw(context) {
@@ -132,6 +137,8 @@ class AnimatedSprite {
 
         context.save();
         context.translate(this.position.x, this.position.y);
+        context.rotate(this.position.angle + this.position.spinAngle);
+        context.translate(this.deltaX, this.deltaY);
         context.drawImage(
             this.image,
             x * this.imageWidth, y * this.imageHeight, this.imageWidth, this.imageHeight,
@@ -211,6 +218,7 @@ class SoundManager {
             'gameover',
             'explosion',
             'shot',
+            'missile',
             'jet',
             'music',
             'dock',
@@ -273,6 +281,8 @@ class ImageManager {
             'asteroid',
             'explosion',
             'station',
+            'missile',
+            'missileFire',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
@@ -327,7 +337,8 @@ class Keys {
             ArrowRight: false,
             ArrowUp: false,
             ArrowDown: false,
-            ControlLeft: false
+            ControlLeft: false,
+            ShiftLeft: false
         };
 
         document.addEventListener("keydown", function (event) {
@@ -337,6 +348,7 @@ class Keys {
                 case 'ArrowRight':
                 case 'ArrowDown':
                 case 'ControlLeft':
+                case 'ShiftLeft':
                     this.state[event.code] = true;
                     break;
             }
@@ -349,6 +361,7 @@ class Keys {
                 case 'ArrowRight':
                 case 'ArrowDown':
                 case 'ControlLeft':
+                case 'ShiftLeft':
                     this.state[event.code] = false;
                     break;
             }
@@ -383,13 +396,14 @@ class SplashScreen {
             context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
 
             context.font = "16px 'Courier New', Courier, monospace";
-            context.fillText("Arrow " + String.fromCharCode(8593) + "   - move", textLeft, this.height / 2 - 9 + 70);
-            context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
-            context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
-            context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-            context.fillText("Key Z     - dock / undock", textLeft, this.height / 2 - 9 + 150);
-            context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 170);
-            context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 190);
+            context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
+            context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
+            context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
+            context.fillText("Left CTRL  - shoot", textLeft, this.height / 2 - 9 + 130);
+            context.fillText("Left SHIFT - launch missile", textLeft, this.height / 2 - 9 + 150);
+            context.fillText("Key Z      - dock / undock", textLeft, this.height / 2 - 9 + 170);
+            context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 190);
+            context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 210);
         }
     }
 }
@@ -418,13 +432,14 @@ class PauseScreen {
         context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
 
         context.font = "16px 'Courier New', Courier, monospace";
-        context.fillText("Arrow " + String.fromCharCode(8593) + "   - move", textLeft, this.height / 2 - 9 + 70);
-        context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
-        context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
-        context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("Key Z     - dock / undock", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 170);
-        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 190);
+        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Left CTRL  - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("Left SHIFT - launch missile", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("Key Z      - dock / undock", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 190);
+        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 210);
     }
 }
 
@@ -453,13 +468,14 @@ class GameOverScreen {
         context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
 
         context.font = "16px 'Courier New', Courier, monospace";
-        context.fillText("Arrow " + String.fromCharCode(8593) + "   - move", textLeft, this.height / 2 - 9 + 70);
-        context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
-        context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
-        context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("Key Z     - dock / undock", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 170);
-        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 190);
+        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Left CTRL  - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("Left SHIFT - launch missile", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("Key Z      - dock / undock", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 190);
+        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 210);
 
         this.playSound();
     }
@@ -495,13 +511,14 @@ class WinnerScreen {
         context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
 
         context.font = "16px 'Courier New', Courier, monospace";
-        context.fillText("Arrow " + String.fromCharCode(8593) + "   - move", textLeft, this.height / 2 - 9 + 70);
-        context.fillText("Arrow " + String.fromCharCode(8592) + "   - rotate left", textLeft, this.height / 2 - 9 + 90);
-        context.fillText("Arrow " + String.fromCharCode(8594) + "   - rotate right", textLeft, this.height / 2 - 9 + 110);
-        context.fillText("Left CTRL - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("Key Z     - dock / undock", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("ENTER     - pause", textLeft, this.height / 2 - 9 + 170);
-        context.fillText("ESCAPE    - reset", textLeft, this.height / 2 - 9 + 190);
+        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Left CTRL  - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("Left SHIFT - launch missile", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("Key Z      - dock / undock", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 190);
+        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 210);
 
         this.playSound();
     }
@@ -671,6 +688,12 @@ class CollisionEngine {
         return wreckles;
     }
 
+    checkAmmoCollisions() {
+        const w1 = this.checkBulletCollisions();
+        const w2 = this.checkMissileCollisions();
+        return [...w1, ...w2];
+    }
+
     checkBulletCollisions() {
         const bullets = this.figures.get().filter(f => f instanceof Bullet && !f.getGameObject().getIsDestroyed());
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
@@ -681,7 +704,26 @@ class CollisionEngine {
                 const isCollision = this.checkCollision(m, a);
                 if (isCollision) {
                     m.blowUp();
-                    const wrecklesA = a.blowUp();
+                    const wrecklesA = a.blowUp(1);
+                    if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
+                }
+            }
+        }
+
+        return wreckles;
+    }
+
+    checkMissileCollisions() {
+        const missiles = this.figures.get().filter(f => f instanceof Missile && !f.getGameObject().getIsDestroyed());
+        const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
+        const wreckles = [];
+
+        for (let a of asteroids) {
+            for (let m of missiles) {
+                const isCollision = this.checkCollision(m, a);
+                if (isCollision) {
+                    m.blowUp();
+                    const wrecklesA = a.blowUp(100);
                     if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
                 }
             }
@@ -814,6 +856,12 @@ class Ship {
         this.shotAt = null;
         this.shotSound = null;
 
+        this.missilesPerSecond = 1; // Скорострельность: 1 ракета в секунду
+        this.missileLaunchedAt = null;
+        this.missileSound = null;
+        this.maxMissiles = 5;
+        this.missileCount = 5;
+
         this.maxHealth = 100;
         this.health = 100;
         this.maxAmmo = 30;
@@ -864,6 +912,23 @@ class Ship {
 
             this.ammo -= 1;
             return new Bullet(this.gameObject.x, this.gameObject.y, this.gameObject.angle + this.gameObject.spinAngle);
+        } else {
+            return null;
+        }
+    }
+
+    launchMissile() {
+        if (this.missileCount <= 0) return null;
+        const now = new Date().getTime();
+        const timeout = 1000 / this.missilesPerSecond;
+        if (this.missileLaunchedAt == null || this.missileLaunchedAt + timeout < now) {
+            this.missileLaunchedAt = now;
+
+            if (!this.missileSound) this.missileSound = soundManager.get('shot');
+            this.missileSound.play(0.1);
+
+            this.missileCount -= 1;
+            return new Missile(this.gameObject.x, this.gameObject.y, this.gameObject.angle + this.gameObject.spinAngle);
         } else {
             return null;
         }
@@ -951,6 +1016,43 @@ class Bullet {
     }
 }
 
+class Missile {
+    constructor(x, y, angle) {
+        this.width = 10;
+        this.height = 10;
+        this.speed = 55;
+        this.rotateSpeed = 0.2; // Скорость разворота: 0.2 оборота в секунду
+        this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, true);
+
+        this.drawItemMissile = new Sprite(imageManager.get('missile'), 30, 10, this.gameObject);
+        this.drawItemMissileFire = new Sprite(imageManager.get('missileFire'), 10, 5, this.gameObject, -20, 0);
+        this.drawItem = new CombinedDrawItem([
+            this.drawItemMissile,
+            this.drawItemMissileFire,
+        ]);
+
+        this.missileSound = soundManager.get('missile'); // New each time. This sound is looped it has to be stopped on destroy
+        this.missileSound.play(2, true, true);
+
+        this.gameObject.destroy = () => {
+            this.gameObject.isDestroyed = true;
+            this.missileSound.stop();
+        }
+    }
+
+    getDrawItem() {
+        return this.drawItem;
+    }
+
+    getGameObject() {
+        return this.gameObject;
+    }
+
+    blowUp() {
+        this.getGameObject().destroy();
+    }
+}
+
 class Asteroid {
     constructor(x, y, angle, radius, speed, spinSpeed) {
         this.radius = radius;
@@ -984,7 +1086,7 @@ class Asteroid {
         return this.gameObject;
     }
 
-    blowUp() {
+    blowUp(power) {
         this.getGameObject().destroy();
 
         if (!this.explosionSound) this.explosionSound = soundManager.get('explosion');
@@ -996,8 +1098,8 @@ class Asteroid {
         const y = this.getGameObject().y;
         wreckles.push(new Explosion(x, y, this.radius * 2));
 
-        if (this.radius > 20) {
-            const wreckleRadius = this.radius / 3;
+        if (power < 100 && this.radius > 20) {
+            const wreckleRadius = this.radius / 2;
             const wreckleSpeed = this.speed * 1.5;
 
             const spinSpeed = this.getGameObject().spinSpeed * 2;
@@ -1025,7 +1127,7 @@ class Explosion {
         this.numFramesY = 9;
 
         this.gameObject = new GameObject(x, y, this.width, this.height, 0, 0, 0, false, 0);
-        this.drawItem = new AnimatedSprite(imageManager.get('explosion'), radius * 2, radius * 2, this.width, this.height, this.gameObject, this.numFramesX, this.numFramesY, false, () => {
+        this.drawItem = new AnimatedSprite(imageManager.get(this.imgSrc), radius * 2, radius * 2, this.width, this.height, this.gameObject, this.numFramesX, this.numFramesY, false, () => {
             this.gameObject.destroy();
         });
     }
@@ -1071,6 +1173,9 @@ class Station {
 
         this.ammoLoadsPerSecond = 2;
         this.ammoLoadedAt = null;
+
+        this.missileLoadsPerSecond = 0.25;
+        this.missileLoadedAt = null;
     }
 
     getDrawItem() {
@@ -1152,17 +1257,38 @@ class Station {
     loadAmmo() {
         if (this.dockedShip) {
             const now = new Date().getTime();
-            const timeout = 1000 / this.ammoLoadsPerSecond;
-            const timeToLoad = this.ammoLoadedAt == null || this.ammoLoadedAt + timeout < now;
-            if (this.dockedShip.ammo < this.dockedShip.maxAmmo && timeToLoad) {
+            if (this.ammoLoadedAt == null) {
                 this.ammoLoadedAt = now;
-                this.dockedShip.ammo += 1;
+            } else {
+                const timeout = 1000 / this.ammoLoadsPerSecond;
+                const timeToLoad = this.ammoLoadedAt + timeout < now;
+                if (this.dockedShip.ammo < this.dockedShip.maxAmmo && timeToLoad) {
+                    this.ammoLoadedAt = now;
+                    this.dockedShip.ammo += 1;
+                }
+            }
+        }
+    }
+
+    loadMissile() {
+        if (this.dockedShip) {
+            const now = new Date().getTime();
+            if (this.missileLoadedAt == null) {
+                this.missileLoadedAt = now;
+            } else {
+                const timeout = 1000 / this.missileLoadsPerSecond;
+                const timeToLoad = this.missileLoadedAt + timeout < now;
+                if (this.dockedShip.missileCount < this.dockedShip.maxMissiles && timeToLoad) {
+                    this.missileLoadedAt = now;
+                    this.dockedShip.missileCount += 1;
+                }
             }
         }
     }
 
     tick() {
         this.loadAmmo();
+        this.loadMissile();
     }
 }
 
@@ -1183,6 +1309,14 @@ class StatusPanel {
                 context.fillStyle = '#888';
                 context.font = "14px  'Courier New', Courier, monospace";
                 context.fillText(`Ammo: ${this.game.ship.ammo} / ${this.game.ship.maxAmmo}`, 170, 20);
+            }
+        };
+
+        this.shipMissiles = {
+            draw: context => {
+                context.fillStyle = '#888';
+                context.font = "14px  'Courier New', Courier, monospace";
+                context.fillText(`Missiles: ${this.game.ship.missileCount} / ${this.game.ship.maxMissiles}`, 300, 20);
             }
         };
 
@@ -1212,6 +1346,7 @@ class StatusPanel {
         this.drawItem = new CombinedDrawItem([
             this.shipHealth,
             this.shipAmmo,
+            this.shipMissiles,
             this.messages,
         ]);
     }
@@ -1391,6 +1526,14 @@ class Game {
                 this.addFigure(bullet);
             }
         }
+
+        // Shoot
+        if (k.ShiftLeft) {
+            const missile = this.ship.launchMissile();
+            if (missile) {
+                this.addFigure(missile);
+            }
+        }
     }
 
     performAll() {
@@ -1398,7 +1541,7 @@ class Game {
         this.physicsEngine.moveAll();
         this.renderEngine.drawFrame();
 
-        const newFigures1 = this.collisionEngine.checkBulletCollisions();
+        const newFigures1 = this.collisionEngine.checkAmmoCollisions();
         for (let a of newFigures1) {
             this.addFigure(a);
         }
@@ -1479,6 +1622,13 @@ class Game {
         if (this.musicSound) {
             this.musicSound.stop();
         }
+
+        // Stop missile sound
+        this.figures.get().forEach(f => {
+            if (f instanceof Missile) {
+                f.getGameObject().destroy();
+            }
+        });
     }
 }
 
