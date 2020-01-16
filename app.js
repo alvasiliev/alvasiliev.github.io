@@ -1699,6 +1699,7 @@ class Game {
         this.isFinished = true;
         clearInterval(this.intervalHandle);
         this.intervalHandle = null;
+        this.renderEngine.drawFrame();
         this.renderEngine.drawVictoryScreen();
         if (this.ship) this.ship.dispose();
         this.stopMusic();
