@@ -293,7 +293,6 @@ class StatusPanel {
                         if (ship && !ship.getGameObject().getIsDestroyed()) {
                             if (ship.ammo <= 0 && !ship.dockedStation) {
                                 msgs.push(`OUT OF AMMO`);
-                                msgs.push(`Dock to station to charge`);
                             }
                         }
                     }
@@ -313,9 +312,27 @@ class StatusPanel {
             }
         };
 
+        this.duration = {
+            draw: context => {
+                if (!this.game.currentMission.getRequiredDuration) return;
+
+                let durationLeft = this.game.currentMission.getRequiredDuration() - this.game.currentMission.getMissionDuration();
+                if (durationLeft < 0) durationLeft = 0;
+                const msg = durationLeft.toFixed();
+
+                const originalTextAlign = context.textAlign;
+                context.textAlign = 'end';
+                context.font = "60px  'Courier New', Courier, monospace";
+                context.fillStyle = 'rgba(240,240,240,0.3)';
+                context.fillText(msg, this.game.width - 20, this.game.height - 20);
+                context.textAlign = originalTextAlign;
+            }
+        };
+
         return new CombinedDrawItem([
             ...shipStatuses,
             this.messages,
+            this.duration,
         ]);
     }
 
@@ -500,6 +517,40 @@ class VictoryScreen {
         context.fillStyle = '#ddd';
         context.font = "48px 'Courier New', Courier, monospace";
         context.fillText("MISSION ACCOMPLISHED", this.width / 2, this.height / 2 - 50);
+
+        context.fillStyle = '#aaa';
+        context.font = "18px 'Courier New', Courier, monospace";
+        context.fillText("Press ENTER start next mission", this.width / 2, this.height / 2 - 9);
+        context.textAlign = originalTextAlign;
+
+        this.controlsInfo.draw(context);
+
+        this.playSound();
+    }
+
+    playSound() {
+        if (!this.sound) this.sound = soundManager.get('victory');
+        this.sound.play();
+    }
+}
+
+class CampaignFinishedScreen {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.background = new Rect(width, height, '#0F5D06');
+        this.controlsInfo = new ControlsInfo(width, height);
+        this.sound = null;
+    }
+
+    draw(context) {
+        this.background.draw(context);
+
+        const originalTextAlign = context.textAlign;
+        context.textAlign = 'center';
+        context.fillStyle = '#ddd';
+        context.font = "48px 'Courier New', Courier, monospace";
+        context.fillText("COMPAING FINISHED", this.width / 2, this.height / 2 - 50);
 
         context.fillStyle = '#aaa';
         context.font = "18px 'Courier New', Courier, monospace";
@@ -783,6 +834,11 @@ class RenderEngine {
 
     drawVictoryScreen() {
         const screen = new VictoryScreen(this.width, this.height);
+        screen.draw(this.context);
+    }
+
+    drawCampaignFinishedScreen() {
+        const screen = new CampaignFinishedScreen(this.width, this.height);
         screen.draw(this.context);
     }
 
@@ -1641,7 +1697,134 @@ class Beacon {
 
 // Game
 
-class Mission {
+class Campaign {
+    constructor() {
+        this.missions = [{
+            name: 'Mission 1',
+            create: game => new Mission1(game)
+        }, {
+            name: 'Mission 2',
+            create: game => new Mission2(game)
+        }, {
+            name: 'Mission 3',
+            create: game => new Mission3(game)
+        }];
+    }
+
+    getMissions() {
+        return this.missions;
+    }
+}
+
+class Mission1 {
+    constructor(game) {
+        this.game = game;
+        this.status = 'inProgress'; // inProgress, succeeded, failed, interrupted
+
+        this.numOfAsteroids = 5;
+
+        this.objects = this._generate();
+    }
+
+    checkResult() {
+        if (this.status != 'inProgress') return this.status;
+
+        const allShips = this.game.players.map(player => player.getShip());
+        const shipsAlive = allShips.filter(ship => ship.health > 0);
+
+        if (shipsAlive.length === 0) {
+            this.status = 'failed'
+        } else {
+            const asteroids = this.game.figures.get().filter(obj => obj instanceof Asteroid && !obj.getGameObject().getIsDestroyed());
+            if (asteroids.length === 0) {
+                this.status = 'succeeded'
+            }
+        }
+
+        return this.status;
+    }
+
+    interrupt() {
+        this.status = 'interrupted'
+    }
+
+    isInProgress() {
+        return this.status === 'inProgress';
+    }
+
+    isSucceeded() {
+        return this.status === 'succeeded';
+    }
+
+    isFailed() {
+        return this.status === 'failed';
+    }
+
+    isInterrupted() {
+        return this.status === 'interrupted';
+    }
+
+    getDescription() {
+        return [
+            'You mission is to destroy all the asteroids'
+        ];
+    }
+
+    getObjects() {
+        return this.objects;
+    }
+
+    _generate() {
+        return this._generateAsteroids(this.numOfAsteroids, this.game.width, this.game.height);
+    }
+
+    _generateAsteroids(asteroidsCount, width, height) {
+        const asteroids = [];
+        const minRadius = 20;
+        const maxRadius = 70;
+        const minSpeed = 1;
+        const maxSpeed = 20;
+        const maxSpin = 0.5;
+        for (let i = 0; i < asteroidsCount; ++i) {
+            const rand = Math.random();
+            const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
+            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
+            const pos = this._getRandomStartPosition(width, height);
+            const angle = Math.random() * 360 * Math.PI / 180;
+            const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
+
+            const a = new Asteroid(pos.x, pos.y, angle, radius, speed, spinSpeed);
+            asteroids.push(a);
+        }
+        return asteroids;
+    }
+
+    _getRandomStartPosition(width, height) {
+        const linearPos = Math.trunc((width + height) * 2 * Math.random());
+
+        let x, y;
+        if (linearPos < width) {
+            x = linearPos;
+            y = 0;
+        } else if (linearPos < width + height) {
+            x = width;
+            y = linearPos - width;
+        } else if (linearPos < width * 2 + height) {
+            x = linearPos - width - height;
+            y = height;
+        } else {
+            x = 0;
+            y = linearPos - width * 2 - height;
+        }
+
+        return {
+            x,
+            y
+        }
+    }
+}
+
+class Mission2 {
     constructor(game) {
         this.game = game;
         this.status = 'inProgress'; // inProgress, succeeded, failed, interrupted
@@ -1703,9 +1886,9 @@ class Mission {
     }
 
     _generate() {
-        const asteroids = Mission._generateAsteroids(this.numOfAsteroids, this.game.width, this.game.height);
-        const stations = Mission._generateStations(this.game.width, this.game.height);
-        const beacons = Mission._generateBeacons(this.numOfBeacons, this.game.width, this.game.height);
+        const asteroids = this._generateAsteroids(this.numOfAsteroids, this.game.width, this.game.height);
+        const stations = this._generateStations(this.game.width, this.game.height);
+        const beacons = this._generateBeacons(this.numOfBeacons, this.game.width, this.game.height);
         return [
             ...asteroids,
             ...stations,
@@ -1713,7 +1896,7 @@ class Mission {
         ];
     }
 
-    static _generateAsteroids(asteroidsCount, width, height) {
+    _generateAsteroids(asteroidsCount, width, height) {
         const asteroids = [];
         const minRadius = 20;
         const maxRadius = 70;
@@ -1724,7 +1907,7 @@ class Mission {
             const rand = Math.random();
             const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
             const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
-            const pos = Mission._getRandomStartPosition(width, height);
+            const pos = this._getRandomStartPosition(width, height);
             const angle = Math.random() * 360 * Math.PI / 180;
             const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
 
@@ -1734,7 +1917,7 @@ class Mission {
         return asteroids;
     }
 
-    static _generateStations(width, height) {
+    _generateStations(width, height) {
         const stations = [];
 
         const x = width / 2;
@@ -1745,14 +1928,14 @@ class Mission {
         return stations;
     }
 
-    static _generateBeacons(totalBeaconCount, width, height) {
+    _generateBeacons(totalBeaconCount, width, height) {
         const beacons = [];
         const minSpeed = 1;
         const maxSpeed = 20;
         for (let i = 0; i < totalBeaconCount; ++i) {
             const rand = Math.random();
             const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
-            const pos = Mission._getRandomStartPosition(width, height);
+            const pos = this._getRandomStartPosition(width, height);
             const angle = Math.random() * 360 * Math.PI / 180;
 
             const b = new Beacon(pos.x, pos.y, angle, speed);
@@ -1761,7 +1944,7 @@ class Mission {
         return beacons;
     }
 
-    static _getRandomStartPosition(width, height) {
+    _getRandomStartPosition(width, height) {
         const linearPos = Math.trunc((width + height) * 2 * Math.random());
 
         let x, y;
@@ -1783,6 +1966,139 @@ class Mission {
             x,
             y
         }
+    }
+}
+
+class Mission3 {
+    constructor(game) {
+        this.game = game;
+        this.status = 'inProgress'; // inProgress, succeeded, failed, interrupted
+
+        this.numOfAsteroids = 35;
+        this.requiredDuration = 30;
+
+        this.objects = this._generate();
+        this.missionStartedAt = new Date().getTime();
+        this.pauseDuration = 0;
+        this.missionPausedAt = null;
+    }
+
+    checkResult() {
+        if (this.status != 'inProgress') return this.status;
+
+        const allShips = this.game.players.map(player => player.getShip());
+        const shipsAlive = allShips.filter(ship => ship.health > 0);
+
+        if (shipsAlive.length === 0) {
+            this.status = 'failed'
+        } else {
+            const missionDuration = this.getMissionDuration();
+            if (missionDuration >= this.getRequiredDuration()) {
+                this.status = 'succeeded';
+            }
+        }
+
+        return this.status;
+    }
+
+    interrupt() {
+        this.status = 'interrupted'
+    }
+
+    isInProgress() {
+        return this.status === 'inProgress';
+    }
+
+    isSucceeded() {
+        return this.status === 'succeeded';
+    }
+
+    isFailed() {
+        return this.status === 'failed';
+    }
+
+    isInterrupted() {
+        return this.status === 'interrupted';
+    }
+
+    getDescription() {
+        return [
+            `You must survive for ${this.getRequiredDuration()} seconds`
+        ];
+    }
+
+    getObjects() {
+        return this.objects;
+    }
+
+    _generate() {
+        return this._generateAsteroids(this.numOfAsteroids, this.game.width, this.game.height);
+    }
+
+    _generateAsteroids(asteroidsCount, width, height) {
+        const asteroids = [];
+        const minRadius = 10;
+        const maxRadius = 15;
+        const minSpeed = 20;
+        const maxSpeed = 30;
+        const maxSpin = 0.5;
+        for (let i = 0; i < asteroidsCount; ++i) {
+            const rand = Math.random();
+            const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
+            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
+            const pos = this._getRandomStartPosition(width, height);
+            const angle = Math.random() * 360 * Math.PI / 180;
+            const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
+
+            const a = new Asteroid(pos.x, pos.y, angle, radius, speed, spinSpeed);
+            asteroids.push(a);
+        }
+        return asteroids;
+    }
+
+    _getRandomStartPosition(width, height) {
+        const linearPos = Math.trunc((width + height) * 2 * Math.random());
+
+        let x, y;
+        if (linearPos < width) {
+            x = linearPos;
+            y = 0;
+        } else if (linearPos < width + height) {
+            x = width;
+            y = linearPos - width;
+        } else if (linearPos < width * 2 + height) {
+            x = linearPos - width - height;
+            y = height;
+        } else {
+            x = 0;
+            y = linearPos - width * 2 - height;
+        }
+
+        return {
+            x,
+            y
+        }
+    }
+
+    pause() {
+        if (!this.missionPausedAt) {
+            this.missionPausedAt = new Date().getTime();
+        }
+    }
+
+    resume() {
+        if (this.missionPausedAt) {
+            this.pauseDuration += new Date().getTime() - this.missionPausedAt;
+            this.missionPausedAt = null;
+        }
+    }
+
+    getRequiredDuration() {
+        return this.requiredDuration;
+    }
+
+    getMissionDuration() {
+        return (new Date().getTime() - this.missionStartedAt - this.pauseDuration) / 1000;
     }
 }
 
@@ -1833,6 +2149,8 @@ class Game {
 
         this.musicSound = null;
 
+        this.campaign = new Campaign();
+        this.nextMissionNumber = 0;
         this.currentMission = null;
 
         this.renderEngine.drawSplashScreen(true);
@@ -1877,6 +2195,7 @@ class Game {
     start() {
         if (this.currentMission !== null && this.currentMission.isInProgress()) {
             this.startPerforming();
+            if (this.currentMission.resume) this.currentMission.resume();
         } else {
             this.startMission();
         }
@@ -1886,6 +2205,7 @@ class Game {
         this.stopPerforming();
         this.renderEngine.drawFrame();
         this.renderEngine.drawPauseScreen();
+        if (this.currentMission.pause) this.currentMission.pause();
     }
 
     stop() {
@@ -2004,7 +2324,8 @@ class Game {
     startMission() {
         if (this.currentMission !== null && this.currentMission.isInProgress()) return;
 
-        this.currentMission = new Mission(this);
+        const mission = this.campaign.missions[this.nextMissionNumber];
+        this.currentMission = mission.create(this);
 
         const background = new Background(this.width, this.height);
         const missionObjects = this.currentMission.getObjects();
@@ -2051,11 +2372,7 @@ class Game {
     }
 
     showMissionDescription() {
-        this.missionDescription.show([
-            'You mission is to gather all the beacons',
-            'Asteroids can hit both you and station',
-            'Protect the station - you can get ammo there',
-        ]);
+        this.missionDescription.show(this.currentMission.getDescription());
         setTimeout(() => {
             this.missionDescription.hide();
         }, 3000);
@@ -2106,7 +2423,13 @@ class Game {
     win() {
         this.stopMission();
         this.renderEngine.drawFrame();
-        this.renderEngine.drawVictoryScreen();
+        this.nextMissionNumber += 1;
+        if (this.campaign.missions.length === this.nextMissionNumber) {
+            this.renderEngine.drawCampaignFinishedScreen();
+            this.nextMissionNumber = 0;
+        } else {
+            this.renderEngine.drawVictoryScreen();
+        }
     }
 }
 
