@@ -1399,9 +1399,12 @@ class StatusPanel {
 
         this.shipBeacons = {
             draw: context => {
-                context.fillStyle = '#888';
-                context.font = "14px  'Courier New', Courier, monospace";
-                context.fillText(`Beacons: ${this.game.ship.beaconCount} / ${this.game.totalBeaconCount}`, 440, 20);
+                const numOfBeacons = this.game.currentMission.numOfBeacons;
+                if (numOfBeacons) {
+                    context.fillStyle = '#888';
+                    context.font = "14px  'Courier New', Courier, monospace";
+                    context.fillText(`Beacons: ${this.game.ship.beaconCount} / ${numOfBeacons}`, 440, 20);
+                }
             }
         };
 
@@ -1512,11 +1515,151 @@ class Beacon {
 
 // Game
 
+class Mission {
+    constructor(game) {
+        this.game = game;
+        this.status = 'inProgress'; // inProgress, succeeded, failed, interrupted
+
+        this.numOfAsteroids = 5;
+        this.numOfBeacons = 3;
+
+        this.objects = this._generate();
+    }
+
+    checkResult() {
+        if (this.status != 'inProgress') return this.status;
+
+        if (this.game.ship.health <= 0) {
+            this.status = 'failed'
+        } else {
+            if (this.game.ship.beaconCount === this.numOfBeacons) {
+                this.status = 'succeeded'
+            }
+        }
+
+        return this.status;
+    }
+
+    interrupt() {
+        this.status = 'interrupted'
+    }
+
+    isInProgress() {
+        return this.status === 'inProgress';
+    }
+
+    isSucceeded() {
+        return this.status === 'succeeded';
+    }
+
+    isFailed() {
+        return this.status === 'failed';
+    }
+
+    isInterrupted() {
+        return this.status === 'interrupted';
+    }
+
+    getDescription() {
+        return [
+            'You mission is to gather all the beacons',
+            'Asteroids can hit both you and station',
+            'Protect the station - you can get ammo there',
+        ];
+    }
+
+    getObjects() {
+        return this.objects;
+    }
+
+    _generate() {
+        const asteroids = Mission._generateAsteroids(this.numOfAsteroids, this.game.width, this.game.height);
+        const stations = Mission._generateStations(this.game.width, this.game.height);
+        const beacons = Mission._generateBeacons(this.numOfBeacons, this.game.width, this.game.height);
+        return [
+            ...asteroids,
+            ...stations,
+            ...beacons,
+        ];
+    }
+
+    static _generateAsteroids(asteroidsCount, width, height) {
+        const asteroids = [];
+        const minRadius = 20;
+        const maxRadius = 70;
+        const minSpeed = 1;
+        const maxSpeed = 20;
+        const maxSpin = 0.5;
+        for (let i = 0; i < asteroidsCount; ++i) {
+            const rand = Math.random();
+            const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
+            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
+            const pos = Mission._getRandomStartPosition(width, height);
+            const angle = Math.random() * 360 * Math.PI / 180;
+            const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
+
+            const a = new Asteroid(pos.x, pos.y, angle, radius, speed, spinSpeed);
+            asteroids.push(a);
+        }
+        return asteroids;
+    }
+
+    static _generateStations(width, height) {
+        const stations = [];
+
+        const x = width / 2;
+        const y = height / 2;
+        const s = new Station(x, y);
+        stations.push(s);
+
+        return stations;
+    }
+
+    static _generateBeacons(totalBeaconCount, width, height) {
+        const beacons = [];
+        const minSpeed = 1;
+        const maxSpeed = 20;
+        for (let i = 0; i < totalBeaconCount; ++i) {
+            const rand = Math.random();
+            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
+            const pos = Mission._getRandomStartPosition(width, height);
+            const angle = Math.random() * 360 * Math.PI / 180;
+
+            const b = new Beacon(pos.x, pos.y, angle, speed);
+            beacons.push(b);
+        }
+        return beacons;
+    }
+
+    static _getRandomStartPosition(width, height) {
+        const linearPos = Math.trunc((width + height) * 2 * Math.random());
+
+        let x, y;
+        if (linearPos < width) {
+            x = linearPos;
+            y = 0;
+        } else if (linearPos < width + height) {
+            x = width;
+            y = linearPos - width;
+        } else if (linearPos < width * 2 + height) {
+            x = linearPos - width - height;
+            y = height;
+        } else {
+            x = 0;
+            y = linearPos - width * 2 - height;
+        }
+
+        return {
+            x,
+            y
+        }
+    }
+}
+
 class Game {
     constructor(imageManager, soundManager, w, h) {
         this.intervalHandle = null;
         this.calcFrequency = 60; // 60 раз в секунду
-        this.isFinished = true;
 
         this.userControls = new UserControls();
         this.figures = new Figures();
@@ -1525,13 +1668,16 @@ class Game {
         this.height = h || 768;
         this.statusPanel = new StatusPanel(this);
         this.missionDescription = new MissionDescription(this);
-        this.renderEngine = new RenderEngine(this.width, this.height, this.figures, [this.statusPanel, this.missionDescription]);
+        this.renderEngine = new RenderEngine(this.width, this.height, this.figures, [
+            this.statusPanel,
+            this.missionDescription,
+        ]);
         this.physicsEngine = new PhysicsEngine(this.width, this.height, this.figures);
         this.collisionEngine = new CollisionEngine(this.figures);
 
         this.musicSound = null;
 
-        this.totalBeaconCount = 3;
+        this.currentMission = null;
 
         this.renderEngine.drawSplashScreen(true);
         imageManager.onLoadFinished = () => {
@@ -1549,10 +1695,11 @@ class Game {
     }
 
     loadFinished() {
-        this.background = new Background(this.width, this.height);
         this.renderEngine.drawSplashScreen(false);
     }
 
+    //-------------------------------------------------------------------------
+    // GAME MENU
     configureKeys() {
         document.addEventListener("keypress", function (event) {
             if (event.code === 'Enter') {
@@ -1566,121 +1713,30 @@ class Game {
 
         document.addEventListener("keyup", function (event) {
             if (event.code === 'Escape') {
-                if (this.intervalHandle) {
-                    clearInterval(this.intervalHandle);
-                    this.intervalHandle = null;
-                }
-                this.isFinished = true;
-                this.renderEngine.drawSplashScreen();
-                this.stopMusic();
+                this.stop();
             }
         }.bind(this));
     }
 
-    init() {
-        this.background.getDrawItem().color = '#78f';
-        this.figures.set([]);
-
-        this.ship = new Ship(this.width / 2 + 250, this.height / 2, 0);
-
-        const asteroids = this.generateAsteroids();
-        const stations = this.generateStations();
-        const beacons = this.generateBeacons();
-
-        // Order of adding figures is important to render properly
-        this.addFigure(this.background);
-        stations.forEach(s => this.addFigure(s));
-        this.addFigure(this.ship);
-        asteroids.forEach(a => this.addFigure(a));
-        beacons.forEach(b => this.addFigure(b));
-
-        this.physicsEngine.reset();
+    start() {
+        this.startPerforming();
+        this.startMission();
     }
 
-    generateAsteroids() {
-        const asteroids = [];
-        const asteroidsCount = 5;
-        const minRadius = 20;
-        const maxRadius = 70;
-        const minSpeed = 1;
-        const maxSpeed = 20;
-        const maxSpin = 0.5;
-        for (let i = 0; i < asteroidsCount; ++i) {
-            const rand = Math.random();
-            const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
-            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
-
-            const linearPos = Math.trunc((this.width + this.height) * 2 * Math.random());
-
-            let x, y;
-            if (linearPos < this.width) {
-                x = linearPos;
-                y = 0;
-            } else if (linearPos < this.width + this.height) {
-                x = this.width;
-                y = linearPos - this.width;
-            } else if (linearPos < this.width * 2 + this.height) {
-                x = linearPos - this.width - this.height;
-                y = this.height;
-            } else {
-                x = 0;
-                y = linearPos - this.width * 2 - this.height;
-            }
-
-            const angle = Math.random() * 360 * Math.PI / 180;
-
-            const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
-
-            const a = new Asteroid(x, y, angle, radius, speed, spinSpeed);
-            asteroids.push(a);
-        }
-        return asteroids;
+    pause() {
+        this.stopPerforming();
+        this.renderEngine.drawFrame();
+        this.renderEngine.drawPauseScreen();
     }
 
-    generateStations() {
-        const stations = [];
-
-        const x = this.width / 2;
-        const y = this.height / 2;
-        const s = new Station(x, y);
-        stations.push(s);
-
-        return stations;
+    stop() {
+        this.stopPerforming();
+        this.stopMission();
+        this.renderEngine.drawFrame();
+        this.renderEngine.drawSplashScreen();
     }
 
-    generateBeacons() {
-        const beacons = [];
-        const minSpeed = 1;
-        const maxSpeed = 20;
-        for (let i = 0; i < this.totalBeaconCount; ++i) {
-            const rand = Math.random();
-            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
-
-            const linearPos = Math.trunc((this.width + this.height) * 2 * Math.random());
-
-            let x, y;
-            if (linearPos < this.width) {
-                x = linearPos;
-                y = 0;
-            } else if (linearPos < this.width + this.height) {
-                x = this.width;
-                y = linearPos - this.width;
-            } else if (linearPos < this.width * 2 + this.height) {
-                x = linearPos - this.width - this.height;
-                y = this.height;
-            } else {
-                x = 0;
-                y = linearPos - this.width * 2 - this.height;
-            }
-
-            const angle = Math.random() * 360 * Math.PI / 180;
-
-            const b = new Beacon(x, y, angle, speed);
-            beacons.push(b);
-        }
-        return beacons;
-    }
-
+    //-------------------------------------------------------------------------
     addFigure(f) {
         this.figures.add(f);
     }
@@ -1733,6 +1789,8 @@ class Game {
         }
     }
 
+    //-------------------------------------------------------------------------
+    // PERFORMING
     performAll() {
         this.processUserControl(this.ship, this.userControls);
         this.physicsEngine.moveAll();
@@ -1752,46 +1810,53 @@ class Game {
         this.figures.get().filter(f => f.tick).forEach(f => f.tick());
     }
 
-    checkGameResult() {
-        if (this.ship.health <= 0) {
-            this.loose();
-        } else {
-            if (this.ship.beaconCount === this.totalBeaconCount) {
-                this.win();
-            }
-        }
-    }
-
-    loose() {
-        this.isFinished = true;
-        clearInterval(this.intervalHandle);
-        this.intervalHandle = null;
-        this.renderEngine.drawGameOverScreen();
-        if (this.ship) this.ship.dispose();
-        this.stopMusic();
-    }
-
-    win() {
-        this.isFinished = true;
-        clearInterval(this.intervalHandle);
-        this.intervalHandle = null;
-        this.renderEngine.drawFrame();
-        this.renderEngine.drawVictoryScreen();
-        if (this.ship) this.ship.dispose();
-        this.stopMusic();
-    }
-
-    start() {
+    startPerforming() {
         if (!this.intervalHandle) {
             this.physicsEngine.reset();
             this.intervalHandle = setInterval(() => this.performAll(), 1000 / this.calcFrequency);
         }
-        if (this.isFinished) {
-            this.isFinished = false;
-            this.init();
-            this.startMusic();
+    }
+
+    stopPerforming() {
+        if (this.intervalHandle) {
+            clearInterval(this.intervalHandle);
+            this.intervalHandle = null;
         }
+    }
+
+    //-------------------------------------------------------------------------
+    // MISSION
+    startMission() {
+        if (this.currentMission !== null && this.currentMission.isInProgress()) return;
+
+        this.currentMission = new Mission(this);
+
+        const background = new Background(this.width, this.height);
+        const missionObjects = this.currentMission.getObjects();
+        this.ship = new Ship(this.width / 2 + 250, this.height / 2, 0);
+
+        // Order of adding figures is important to render properly
+        this.figures.set([]);
+        this.addFigure(background);
+        missionObjects.forEach(o => this.addFigure(o));
+        this.addFigure(this.ship);
+
+        this.physicsEngine.reset();
+        this.startMusic();
+        this.startPerforming();
         this.showMissionDescription();
+    }
+
+    stopMission() {
+        if (this.currentMission == null) return;
+
+        if (this.currentMission.isInProgress()) {
+            this.currentMission.interrupt();
+        }
+
+        if (this.ship) this.ship.dispose();
+
+        this.stopMusic();
     }
 
     showMissionDescription() {
@@ -1803,14 +1868,6 @@ class Game {
         setTimeout(() => {
             this.missionDescription.hide();
         }, 3000);
-    }
-
-    pause() {
-        if (this.intervalHandle) {
-            clearInterval(this.intervalHandle);
-            this.intervalHandle = null;
-            this.renderEngine.drawPauseScreen();
-        }
     }
 
     startMusic() {
@@ -1831,6 +1888,36 @@ class Game {
                 f.getGameObject().destroy();
             }
         });
+    }
+
+    //-------------------------------------------------------------------------
+    // GAME RESULT
+    checkGameResult() {
+        const result = this.currentMission.checkResult();
+        switch (result) {
+            case 'succeeded': {
+                this.win();
+                break;
+            }
+            case 'failed': {
+                this.loose();
+                break;
+            }
+        }
+    }
+
+    loose() {
+        this.stopPerforming();
+        this.stopMission();
+        this.renderEngine.drawFrame();
+        this.renderEngine.drawGameOverScreen();
+    }
+
+    win() {
+        this.stopPerforming();
+        this.stopMission();
+        this.renderEngine.drawFrame();
+        this.renderEngine.drawVictoryScreen();
     }
 }
 
