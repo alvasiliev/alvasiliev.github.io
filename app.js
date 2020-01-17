@@ -333,41 +333,42 @@ class Figures {
     }
 }
 
-class Keys {
-    constructor() {
+class UserControls {
+    constructor(keys) {
+        const actionToKeyMap = keys || {
+            MOVE: 'ArrowUp',
+            LEFT: 'ArrowLeft',
+            RIGHT: 'ArrowRight',
+            SHOOT: 'ControlLeft',
+            LAUNCH: 'ShiftLeft',
+            DOCK: 'KeyZ',
+        }
+
         this.state = {
-            ArrowLeft: false,
-            ArrowRight: false,
-            ArrowUp: false,
-            ArrowDown: false,
-            ControlLeft: false,
-            ShiftLeft: false
+            MOVE: false,
+            LEFT: false,
+            RIGHT: false,
+            SHOOT: false,
+            LAUNCH: false,
+            DOCK: false,
         };
 
+        const keyToActionMap = {};
+        Object.keys(actionToKeyMap).forEach(action => {
+            const key = actionToKeyMap[action];
+            keyToActionMap[key] = action;
+        });
+
         document.addEventListener("keydown", function (event) {
-            switch (event.code) {
-                case 'ArrowLeft':
-                case 'ArrowUp':
-                case 'ArrowRight':
-                case 'ArrowDown':
-                case 'ControlLeft':
-                case 'ShiftLeft':
-                    this.state[event.code] = true;
-                    break;
-            }
+            const key = event.code;
+            const action = keyToActionMap[key];
+            if (action) this.state[action] = true;
         }.bind(this));
 
         document.addEventListener("keyup", function (event) {
-            switch (event.code) {
-                case 'ArrowLeft':
-                case 'ArrowUp':
-                case 'ArrowRight':
-                case 'ArrowDown':
-                case 'ControlLeft':
-                case 'ShiftLeft':
-                    this.state[event.code] = false;
-                    break;
-            }
+            const key = event.code;
+            const action = keyToActionMap[key];
+            if (action) this.state[action] = false;
         }.bind(this));
     }
 }
@@ -675,7 +676,7 @@ class CollisionEngine {
         this.figures = figures;
     }
 
-    checkShipCollisions() {
+    checkShipAsteriodCollisions() {
         const ship = this.figures.get().find(f => f instanceof Ship);
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
         const wreckles = [];
@@ -696,7 +697,7 @@ class CollisionEngine {
         return wreckles;
     }
 
-    checkBulletCollisions() {
+    checkBulletAsteroidCollisions() {
         const bullets = this.figures.get().filter(f => f instanceof Bullet && !f.getGameObject().getIsDestroyed());
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
         const wreckles = [];
@@ -715,7 +716,7 @@ class CollisionEngine {
         return wreckles;
     }
 
-    checkMissileCollisions() {
+    checkMissileAsteroidCollisions() {
         const missiles = this.figures.get().filter(f => f instanceof Missile && !f.getGameObject().getIsDestroyed());
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
         const wreckles = [];
@@ -734,7 +735,7 @@ class CollisionEngine {
         return wreckles;
     }
 
-    checkStationsCollisions() {
+    checkStationAsteroidCollisions() {
         const stations = this.figures.get().filter(f => f instanceof Station && !f.getGameObject().getIsDestroyed());
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
         const wreckles = [];
@@ -771,8 +772,7 @@ class CollisionEngine {
         }
     }
 
-    checkCanDock() {
-        const ship = this.figures.get().find(f => f instanceof Ship);
+    checkCanDock(ship) {
         const stations = this.figures.get().filter(f => f instanceof Station && !f.getGameObject().getIsDestroyed());
 
         for (let s of stations) {
@@ -781,6 +781,15 @@ class CollisionEngine {
             }
         }
         return null;
+    }
+
+    checkShipStationCollisions() {
+        const ship = this.figures.get().find(f => f instanceof Ship);
+        const stations = this.figures.get().filter(f => f instanceof Station && !f.getGameObject().getIsDestroyed());
+
+        for (let s of stations) {
+            s.checkCanDock(ship);
+        }
     }
 
     checkCollision(go1, go2) {
@@ -803,11 +812,12 @@ class CollisionEngine {
     }
 
     checkAllCollisions() {
-        const newFigures1 = this.checkBulletCollisions();
-        const newFigures2 = this.checkMissileCollisions();
-        const newFigures3 = this.checkStationsCollisions();
-        const newFigures4 = this.checkShipCollisions();
+        const newFigures1 = this.checkBulletAsteroidCollisions();
+        const newFigures2 = this.checkMissileAsteroidCollisions();
+        const newFigures3 = this.checkStationAsteroidCollisions();
+        const newFigures4 = this.checkShipAsteriodCollisions();
         this.checkShipBeaconCollisions();
+        this.checkShipStationCollisions();
         return [
             ...newFigures1,
             ...newFigures2,
@@ -899,6 +909,7 @@ class Ship {
         this.maxAmmo = 30;
         this.ammo = 30;
 
+        this.isDockingInProgress = false;
         this.dockedStation = null;
 
         this.beaconCount = 0;
@@ -1009,12 +1020,16 @@ class Ship {
         this.getGameObject().rotateSpeed = 0;
     }
 
+    isDockingIsProgress() {
+        return this.isDockingInProgress;
+    }
+
     isDockedToStation() {
         return this.dockedStation != null;
     }
 
     dockToStation(station) {
-        if (station != null) {
+        if (station != null && !this.isDockedToStation() && !this.isDockingIsProgress()) {
             this.dockedStation = station;
             station.dockShip(this);
 
@@ -1022,11 +1037,16 @@ class Ship {
             this.getGameObject().spinSpeed = station.getGameObject().spinSpeed;
             this.getGameObject().x = station.getGameObject().x;
             this.getGameObject().y = station.getGameObject().y;
+
+            this.isDockingInProgress = true;
+            setTimeout(() => {
+                this.isDockingInProgress = false;
+            }, 2000);
         }
     }
 
     undockFromStation() {
-        if (this.isDockedToStation()) {
+        if (this.isDockedToStation() && !this.isDockingIsProgress()) {
             this.dockedStation.undockShip();
             this.dockedStation = null;
 
@@ -1034,6 +1054,11 @@ class Ship {
             go.angle += go.spinAngle;
             go.spinAngle = 0;
             go.spinSpeed = 0;
+
+            this.isDockingInProgress = true;
+            setTimeout(() => {
+                this.isDockingInProgress = false;
+            }, 2000);
         }
     }
 
@@ -1493,7 +1518,7 @@ class Game {
         this.calcFrequency = 60; // 60 раз в секунду
         this.isFinished = true;
 
-        this.keys = new Keys();
+        this.userControls = new UserControls();
         this.figures = new Figures();
 
         this.width = w || 1024;
@@ -1505,8 +1530,6 @@ class Game {
         this.collisionEngine = new CollisionEngine(this.figures);
 
         this.musicSound = null;
-
-        this.stationToDock = null;
 
         this.totalBeaconCount = 3;
 
@@ -1538,12 +1561,6 @@ class Game {
                 } else {
                     this.pause();
                 }
-            } else if (event.code === 'KeyZ') {
-                if (this.ship.isDockedToStation()) {
-                    this.ship.undockFromStation();
-                } else if (this.stationToDock) {
-                    this.ship.dockToStation(this.stationToDock);
-                }
             }
         }.bind(this));
 
@@ -1570,6 +1587,7 @@ class Game {
         const stations = this.generateStations();
         const beacons = this.generateBeacons();
 
+        // Order of adding figures is important to render properly
         this.addFigure(this.background);
         stations.forEach(s => this.addFigure(s));
         this.addFigure(this.ship);
@@ -1667,43 +1685,56 @@ class Game {
         this.figures.add(f);
     }
 
-    processUserControl() {
-        const k = this.keys.state;
+    processUserControl(ship, userControls) {
+        const k = userControls.state;
+
         // Rotate
-        if (k.ArrowLeft && !k.ArrowRight) {
-            this.ship.turnRotationLeftOn();
-        } else if (!k.ArrowLeft && k.ArrowRight) {
-            this.ship.turnRotationRightOn();
+        if (k.LEFT && !k.RIGHT) {
+            ship.turnRotationLeftOn();
+        } else if (!k.LEFT && k.RIGHT) {
+            ship.turnRotationRightOn();
         } else {
-            this.ship.turnRotationOff();
+            ship.turnRotationOff();
         }
 
         // Move
-        if (k.ArrowUp) {
-            this.ship.turnEngineOn();
+        if (k.MOVE) {
+            ship.turnEngineOn();
         } else {
-            this.ship.turnEngineOff();
+            ship.turnEngineOff();
         }
 
         // Shoot
-        if (k.ControlLeft) {
-            const bullet = this.ship.shoot();
+        if (k.SHOOT) {
+            const bullet = ship.shoot();
             if (bullet) {
                 this.addFigure(bullet);
             }
         }
 
-        // Shoot
-        if (k.ShiftLeft) {
-            const missile = this.ship.launchMissile();
+        // Launch missile
+        if (k.LAUNCH) {
+            const missile = ship.launchMissile();
             if (missile) {
                 this.addFigure(missile);
+            }
+        }
+
+        // Dock to station
+        if (k.DOCK && !ship.isDockingIsProgress()) {
+            if (ship.isDockedToStation()) {
+                ship.undockFromStation();
+            } else {
+                const stationToDock = this.collisionEngine.checkCanDock(ship);
+                if (stationToDock) {
+                    ship.dockToStation(stationToDock);
+                }
             }
         }
     }
 
     performAll() {
-        this.processUserControl();
+        this.processUserControl(this.ship, this.userControls);
         this.physicsEngine.moveAll();
         this.renderEngine.drawFrame();
 
@@ -1718,7 +1749,6 @@ class Game {
 
         this.checkGameResult();
 
-        this.stationToDock = this.collisionEngine.checkCanDock();
         this.figures.get().filter(f => f.tick).forEach(f => f.tick());
     }
 
