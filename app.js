@@ -335,15 +335,6 @@ class Figures {
 
 class UserControls {
     constructor(keys) {
-        const actionToKeyMap = keys || {
-            MOVE: 'ArrowUp',
-            LEFT: 'ArrowLeft',
-            RIGHT: 'ArrowRight',
-            SHOOT: 'ControlLeft',
-            LAUNCH: 'ShiftLeft',
-            DOCK: 'KeyZ',
-        }
-
         this.state = {
             MOVE: false,
             LEFT: false,
@@ -353,23 +344,49 @@ class UserControls {
             DOCK: false,
         };
 
-        const keyToActionMap = {};
+        this.setup(keys);
+        this.onKeyDownHandler = this._onKeyDown.bind(this);
+        this.onKeyUpHandler = this._onKeyUp.bind(this);
+        this._init();
+    }
+
+    _onKeyDown(event) {
+        const key = event.code;
+        const action = this.keyToActionMap[key];
+        if (action) this.state[action] = true;
+    }
+
+    _onKeyUp(event) {
+        const key = event.code;
+        const action = this.keyToActionMap[key];
+        if (action) this.state[action] = false;
+    }
+
+    _init() {
+        this.dispose();
+        document.addEventListener('keydown', this.onKeyDownHandler);
+        document.addEventListener('keyup', this.onKeyUpHandler);
+    }
+
+    setup(keys) {
+        const actionToKeyMap = keys || {
+            MOVE: 'ArrowUp',
+            LEFT: 'ArrowLeft',
+            RIGHT: 'ArrowRight',
+            SHOOT: 'ControlLeft',
+            LAUNCH: 'ShiftLeft',
+            DOCK: 'KeyZ',
+        };
+        this.keyToActionMap = {};
         Object.keys(actionToKeyMap).forEach(action => {
             const key = actionToKeyMap[action];
-            keyToActionMap[key] = action;
+            this.keyToActionMap[key] = action;
         });
+    }
 
-        document.addEventListener("keydown", function (event) {
-            const key = event.code;
-            const action = keyToActionMap[key];
-            if (action) this.state[action] = true;
-        }.bind(this));
-
-        document.addEventListener("keyup", function (event) {
-            const key = event.code;
-            const action = keyToActionMap[key];
-            if (action) this.state[action] = false;
-        }.bind(this));
+    dispose() {
+        document.removeEventListener('keydown', this.onKeyDownHandler);
+        document.removeEventListener('keyup', this.onKeyUpHandler);
     }
 }
 
@@ -1653,6 +1670,16 @@ class Mission {
             x,
             y
         }
+    }
+}
+
+class User {
+    constructor(name, keys) {
+        this.userControls = new UserControls(keys);
+    }
+
+    getUserControls() {
+        return this.userControls;
     }
 }
 
