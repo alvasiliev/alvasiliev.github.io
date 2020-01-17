@@ -59,6 +59,17 @@ class Sprite {
     }
 }
 
+class Img {
+    constructor(x, y, angle, width, height, image) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+        this.width = width;
+        this.height = height;
+        this.image = image;
+    }
+}
+
 class Rect {
     constructor(width, height, color, leftX, topY) {
         this.width = width;
@@ -157,6 +168,348 @@ class CombinedDrawItem {
 
     draw(context) {
         this.drawItems.forEach(di => di.draw(context));
+    }
+}
+
+// UI Parts
+
+class Background {
+    constructor(width, height) {
+        this.background = new Rect(width, height, '#0F065D');
+        this.sprites = {
+            space: new Img(width / 2, height / 2, 0, width, height, imageManager.get('space')),
+            starsSmall: new Img(width / 2, height / 2, 0, width, height, imageManager.get('stars_small')),
+            starsLarge: new Img(width / 2, height / 2, 0, width, height, imageManager.get('stars_large')),
+            cloudsSmall: new Img(width / 2, height / 2, 0, width, height, imageManager.get('cloud_small')),
+            cloudsLarge: new Img(width / 2, height / 2, 0, width, height, imageManager.get('cloud_large')),
+        }
+    }
+
+    drawSprite(context, sprite) {
+        context.save();
+        context.translate(sprite.x, sprite.y);
+        context.rotate(sprite.angle);
+        context.drawImage(
+            sprite.image,
+            0, 0, sprite.width, sprite.height,
+            -sprite.width / 2, -sprite.height / 2, sprite.width, sprite.height
+        );
+        context.restore();
+    }
+
+    drawAll(context) {
+        this.background.draw(context);
+        this.drawSprite(context, this.sprites.space);
+        this.drawSprite(context, this.sprites.starsSmall);
+        this.drawSprite(context, this.sprites.starsLarge);
+        this.drawSprite(context, this.sprites.cloudsSmall);
+        this.drawSprite(context, this.sprites.cloudsLarge);
+    }
+
+    getDrawItem() {
+        return {
+            draw: context => this.drawAll(context)
+        };
+    }
+}
+
+class StatusPanel {
+    constructor(game) {
+        this.game = game;
+
+        const shipStatuses = this.game.users.map((user, i) => {
+            const posY = 20 * (i + 1);
+            const shipHealth = {
+                draw: context => {
+                    const ship = user.getShip();
+                    if (!ship) return;
+                    context.fillStyle = '#888';
+                    context.font = "14px  'Courier New', Courier, monospace";
+                    context.fillText(`Health: ${ship.health} / ${ship.maxHealth}`, 10, posY);
+                }
+            };
+
+            const shipAmmo = {
+                draw: context => {
+                    const ship = user.getShip();
+                    if (!ship) return;
+                    context.fillStyle = '#888';
+                    context.font = "14px  'Courier New', Courier, monospace";
+                    context.fillText(`Ammo: ${ship.ammo} / ${ship.maxAmmo}`, 170, posY);
+                }
+            };
+
+            const shipMissiles = {
+                draw: context => {
+                    const ship = user.getShip();
+                    if (!ship) return;
+                    context.fillStyle = '#888';
+                    context.font = "14px  'Courier New', Courier, monospace";
+                    context.fillText(`Missiles: ${ship.missileCount} / ${ship.maxMissiles}`, 300, posY);
+                }
+            };
+
+            const shipBeacons = {
+                draw: context => {
+                    const ship = user.getShip();
+                    if (!ship) return;
+                    const numOfBeacons = this.game.currentMission.numOfBeacons;
+                    if (numOfBeacons) {
+                        context.fillStyle = '#888';
+                        context.font = "14px  'Courier New', Courier, monospace";
+                        context.fillText(`Beacons: ${ship.beaconCount} / ${numOfBeacons}`, 440, posY);
+                    }
+                }
+            };
+
+            return new CombinedDrawItem([
+                shipHealth,
+                shipAmmo,
+                shipMissiles,
+                shipBeacons,
+            ]);
+        });
+
+        this.messages = {
+            draw: context => {
+                const msgs = [];
+
+                if (this.game.users.length > 1) {
+                    context.font = "26px  'Courier New', Courier, monospace";
+                    for (let user of this.game.users) {
+                        const ship = user.getShip();
+                        if (ship && !ship.getGameObject().getIsDestroyed()) {
+                            if (ship.ammo <= 0 && !ship.dockedStation) {
+                                msgs.push(`${user.getName()} is out of ammo`);
+                            }
+                        }
+                    }
+                } else {
+                    context.font = "36px  'Courier New', Courier, monospace";
+                    const ship = this.game.users[0].getShip();
+                    if (ship && !ship.getGameObject().getIsDestroyed()) {
+                        if (ship.ammo <= 0 && !ship.dockedStation) {
+                            msgs.push(`OUT OF AMMO`);
+                            msgs.push(`Dock to station to charge`);
+                        }
+                    }
+                }
+
+                const originalTextAlign = context.textAlign;
+                context.textAlign = 'center';
+                context.fillStyle = 'rgba(240,240,240,0.3)';
+
+                let top = 80;
+                for (let m of msgs) {
+                    context.fillText(m, this.game.width / 2, top);
+                    top += 40;
+                }
+
+                context.textAlign = originalTextAlign;
+            }
+        };
+
+        this.drawItem = new CombinedDrawItem([
+            ...shipStatuses,
+            this.messages,
+        ]);
+    }
+
+    getDrawItem() {
+        return this.drawItem;
+    }
+}
+
+class MissionDescription {
+    constructor(game) {
+        this.descriptionItem = {
+            draw: context => {
+                if (!this.descriptionLines) return;
+
+                const originalTextAlign = context.textAlign;
+                context.textAlign = 'start';
+                context.fillStyle = 'rgba(240,240,240,0.5)';
+
+                const headerTop = game.height - 50 - 30 * this.descriptionLines.length;
+                context.font = "28px  'Courier New', Courier, monospace";
+                context.fillText('MISSION GOAL', 20, headerTop);
+
+                context.font = "22px  'Courier New', Courier, monospace";
+                let lineNum = 0
+                for (let m of this.descriptionLines) {
+                    const top = game.height - 20 - 30 * (this.descriptionLines.length - lineNum);
+                    context.fillText(m, 20, top);
+                    lineNum += 1;
+                }
+
+                context.textAlign = originalTextAlign;
+            }
+        };
+
+        this.drawItem = new CombinedDrawItem([
+            this.descriptionItem,
+        ]);
+    }
+
+    getDrawItem() {
+        return this.drawItem;
+    }
+
+    show(descriptionLines) {
+        this.descriptionLines = descriptionLines;
+    }
+
+    hide() {
+        this.descriptionLines = null
+    }
+}
+
+class ControlsInfo {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+    }
+
+    draw(context) {
+        context.fillStyle = '#aaa';
+
+        const textLeft = this.width / 2 - 130;
+        context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
+
+        context.font = "16px 'Courier New', Courier, monospace";
+        context.fillText("Arrow " + String.fromCharCode(8593) + "  - move", textLeft, this.height / 2 - 9 + 70);
+        context.fillText("Arrow " + String.fromCharCode(8592) + "  - rotate left", textLeft, this.height / 2 - 9 + 90);
+        context.fillText("Arrow " + String.fromCharCode(8594) + "  - rotate right", textLeft, this.height / 2 - 9 + 110);
+        context.fillText("Key D    - shoot", textLeft, this.height / 2 - 9 + 130);
+        context.fillText("Key S    - launch missile", textLeft, this.height / 2 - 9 + 150);
+        context.fillText("Key A    - dock / undock", textLeft, this.height / 2 - 9 + 170);
+        context.fillText("ENTER    - pause", textLeft, this.height / 2 - 9 + 190);
+        context.fillText("ESCAPE   - reset", textLeft, this.height / 2 - 9 + 210);
+    }
+}
+
+// Screens
+
+class SplashScreen {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.background = new Rect(width, height, '#0E0855');
+        this.controlsInfo = new ControlsInfo(width, height);
+    }
+
+    draw(context, isLoading) {
+        this.background.draw(context);
+
+        context.fillStyle = '#ddd';
+        context.font = "48px 'Courier New', Courier, monospace";
+        context.fillText("ASTEROIDS", this.width / 2 - 130, this.height / 2 - 50);
+
+        if (isLoading) {
+            context.fillStyle = '#aaa';
+            context.font = "18px 'Courier New', Courier, monospace";
+            context.fillText("Loading...", this.width / 2 - 50, this.height / 2 - 9);
+        } else {
+            context.fillStyle = '#aaa';
+            context.font = "18px 'Courier New', Courier, monospace";
+            context.fillText("Press ENTER play", this.width / 2 - 85, this.height / 2 - 9);
+
+            this.controlsInfo.draw(context);
+        }
+    }
+}
+
+class PauseScreen {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.background = new Rect(width, height, '#000');
+        this.controlsInfo = new ControlsInfo(width, height);
+    }
+
+    draw(context) {
+        context.globalAlpha = 0.5;
+        this.background.draw(context);
+        context.globalAlpha = 1;
+
+        context.fillStyle = '#ddd';
+        context.font = "48px 'Courier New', Courier, monospace";
+        context.fillText("PAUSE", this.width / 2 - 80, this.height / 2 - 50);
+
+        context.fillStyle = '#aaa';
+        context.font = "18px 'Courier New', Courier, monospace";
+        context.fillText("Press ENTER continue", this.width / 2 - 110, this.height / 2 - 9);
+
+        this.controlsInfo.draw(context);
+    }
+}
+
+class GameOverScreen {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.background = new Rect(width, height, '#900');
+        this.controlsInfo = new ControlsInfo(width, height);
+        this.sound = null;
+    }
+
+    draw(context) {
+        context.globalAlpha = 0.5;
+        this.background.draw(context);
+        context.globalAlpha = 1;
+
+        context.fillStyle = '#ddd';
+        context.font = "48px 'Courier New', Courier, monospace";
+        context.fillText("GAME OVER", this.width / 2 - 120, this.height / 2 - 50);
+
+        context.fillStyle = '#aaa';
+        context.font = "18px 'Courier New', Courier, monospace";
+        context.fillText("Press ENTER restart", this.width / 2 - 110, this.height / 2 - 9);
+
+        this.controlsInfo.draw(context);
+
+        this.playSound();
+    }
+
+    playSound() {
+        if (!this.sound) this.sound = soundManager.get('gameover');
+        this.sound.play();
+    }
+}
+
+class VictoryScreen {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+        this.background = new Rect(width, height, '#090');
+        this.controlsInfo = new ControlsInfo(width, height);
+        this.sound = null;
+    }
+
+    draw(context) {
+        context.globalAlpha = 0.5;
+        this.background.draw(context);
+        context.globalAlpha = 1;
+
+        const originalTextAlign = context.textAlign;
+        context.textAlign = 'center';
+        context.fillStyle = '#ddd';
+        context.font = "48px 'Courier New', Courier, monospace";
+        context.fillText("MISSION ACCOMPLISHED", this.width / 2, this.height / 2 - 50);
+
+        context.fillStyle = '#aaa';
+        context.font = "18px 'Courier New', Courier, monospace";
+        context.fillText("Press ENTER restart", this.width / 2, this.height / 2 - 9);
+        context.textAlign = originalTextAlign;
+
+        this.controlsInfo.draw(context);
+
+        this.playSound();
+    }
+
+    playSound() {
+        if (!this.sound) this.sound = soundManager.get('victory');
+        this.sound.play();
     }
 }
 
@@ -390,169 +743,6 @@ class UserControls {
     }
 }
 
-class SplashScreen {
-    constructor(width, height) {
-        this.width = width;
-        this.height = height;
-        this.background = new Rect(width, height, '#0E0855');
-    }
-
-    draw(context, isLoading) {
-        this.background.draw(context);
-
-        context.fillStyle = '#ddd';
-        context.font = "48px 'Courier New', Courier, monospace";
-        context.fillText("ASTEROIDS", this.width / 2 - 130, this.height / 2 - 50);
-
-        if (isLoading) {
-            context.fillStyle = '#aaa';
-            context.font = "18px 'Courier New', Courier, monospace";
-            context.fillText("Loading...", this.width / 2 - 50, this.height / 2 - 9);
-        } else {
-            context.fillStyle = '#aaa';
-            context.font = "18px 'Courier New', Courier, monospace";
-            context.fillText("Press ENTER play", this.width / 2 - 85, this.height / 2 - 9);
-
-            const textLeft = this.width / 2 - 130;
-            context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
-
-            context.font = "16px 'Courier New', Courier, monospace";
-            context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
-            context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
-            context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
-            context.fillText("Left CTRL  - shoot", textLeft, this.height / 2 - 9 + 130);
-            context.fillText("Left SHIFT - launch missile", textLeft, this.height / 2 - 9 + 150);
-            context.fillText("Key Z      - dock / undock", textLeft, this.height / 2 - 9 + 170);
-            context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 190);
-            context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 210);
-        }
-    }
-}
-
-class PauseScreen {
-    constructor(width, height) {
-        this.width = width;
-        this.height = height;
-        this.background = new Rect(width, height, '#000');
-    }
-
-    draw(context) {
-        context.globalAlpha = 0.5;
-        this.background.draw(context);
-        context.globalAlpha = 1;
-
-        context.fillStyle = '#ddd';
-        context.font = "48px 'Courier New', Courier, monospace";
-        context.fillText("PAUSE", this.width / 2 - 80, this.height / 2 - 50);
-
-        context.fillStyle = '#aaa';
-        context.font = "18px 'Courier New', Courier, monospace";
-        context.fillText("Press ENTER continue", this.width / 2 - 110, this.height / 2 - 9);
-
-        const textLeft = this.width / 2 - 110;
-        context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
-
-        context.font = "16px 'Courier New', Courier, monospace";
-        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
-        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
-        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
-        context.fillText("Left CTRL  - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("Left SHIFT - launch missile", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("Key Z      - dock / undock", textLeft, this.height / 2 - 9 + 170);
-        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 190);
-        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 210);
-    }
-}
-
-class GameOverScreen {
-    constructor(width, height) {
-        this.width = width;
-        this.height = height;
-        this.background = new Rect(width, height, '#900');
-        this.sound = null;
-    }
-
-    draw(context) {
-        context.globalAlpha = 0.5;
-        this.background.draw(context);
-        context.globalAlpha = 1;
-
-        context.fillStyle = '#ddd';
-        context.font = "48px 'Courier New', Courier, monospace";
-        context.fillText("GAME OVER", this.width / 2 - 120, this.height / 2 - 50);
-
-        context.fillStyle = '#aaa';
-        context.font = "18px 'Courier New', Courier, monospace";
-        context.fillText("Press ENTER restart", this.width / 2 - 110, this.height / 2 - 9);
-
-        const textLeft = this.width / 2 - 110;
-        context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
-
-        context.font = "16px 'Courier New', Courier, monospace";
-        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
-        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
-        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
-        context.fillText("Left CTRL  - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("Left SHIFT - launch missile", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("Key Z      - dock / undock", textLeft, this.height / 2 - 9 + 170);
-        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 190);
-        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 210);
-
-        this.playSound();
-    }
-
-    playSound() {
-        if (!this.sound) this.sound = soundManager.get('gameover');
-        this.sound.play();
-    }
-}
-
-class VictoryScreen {
-    constructor(width, height) {
-        this.width = width;
-        this.height = height;
-        this.background = new Rect(width, height, '#090');
-        this.sound = null;
-    }
-
-    draw(context) {
-        context.globalAlpha = 0.5;
-        this.background.draw(context);
-        context.globalAlpha = 1;
-
-        const originalTextAlign = context.textAlign;
-        context.textAlign = 'center';
-        context.fillStyle = '#ddd';
-        context.font = "48px 'Courier New', Courier, monospace";
-        context.fillText("MISSION ACCOMPLISHED", this.width / 2, this.height / 2 - 50);
-
-        context.fillStyle = '#aaa';
-        context.font = "18px 'Courier New', Courier, monospace";
-        context.fillText("Press ENTER restart", this.width / 2, this.height / 2 - 9);
-        context.textAlign = originalTextAlign;
-
-        const textLeft = this.width / 2 - 110;
-        context.fillText("Keyboard controls:", textLeft, this.height / 2 - 9 + 45);
-
-        context.font = "16px 'Courier New', Courier, monospace";
-        context.fillText("Arrow " + String.fromCharCode(8593) + "    - move", textLeft, this.height / 2 - 9 + 70);
-        context.fillText("Arrow " + String.fromCharCode(8592) + "    - rotate left", textLeft, this.height / 2 - 9 + 90);
-        context.fillText("Arrow " + String.fromCharCode(8594) + "    - rotate right", textLeft, this.height / 2 - 9 + 110);
-        context.fillText("Left CTRL  - shoot", textLeft, this.height / 2 - 9 + 130);
-        context.fillText("Left SHIFT - launch missile", textLeft, this.height / 2 - 9 + 150);
-        context.fillText("Key Z      - dock / undock", textLeft, this.height / 2 - 9 + 170);
-        context.fillText("ENTER      - pause", textLeft, this.height / 2 - 9 + 190);
-        context.fillText("ESCAPE     - reset", textLeft, this.height / 2 - 9 + 210);
-
-        this.playSound();
-    }
-
-    playSound() {
-        if (!this.sound) this.sound = soundManager.get('victory');
-        this.sound.play();
-    }
-}
-
 class RenderEngine {
     constructor(viewportWidth, viewportHeight, figures, userInterfaceItems) {
         this.figures = figures;
@@ -694,19 +884,19 @@ class CollisionEngine {
     }
 
     checkShipAsteriodCollisions() {
-        const ship = this.figures.get().find(f => f instanceof Ship);
+        const ships = this.figures.get().filter(f => f instanceof Ship && !f.getGameObject().getIsDestroyed());
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
         const wreckles = [];
 
-        for (let a of asteroids) {
-            if (!a.getGameObject().getIsDestroyed()) {
-                const isCollision = this.checkCollision(ship, a);
-                if (isCollision) {
-                    const wrecklesA = a.blowUp();
-                    if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
-                    ship.health -= a.getDamage();
-                    if (ship.health <= 0) {
-                        ship.health = 0;
+        for (let ship of ships) {
+            for (let a of asteroids) {
+                if (!a.getGameObject().getIsDestroyed()) {
+                    const isCollision = this.checkCollision(ship, a);
+                    if (isCollision) {
+                        const wrecklesA = a.hit();
+                        if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
+                        const wrecklesS = ship.hit(a.getDamage());
+                        if (wrecklesS && wrecklesS.length) wreckles.push(...wrecklesS);
                     }
                 }
             }
@@ -719,12 +909,12 @@ class CollisionEngine {
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
         const wreckles = [];
 
-        for (let a of asteroids) {
-            for (let m of bullets) {
-                const isCollision = this.checkCollision(m, a);
+        for (let asteroid of asteroids) {
+            for (let bullet of bullets) {
+                const isCollision = this.checkCollision(bullet, asteroid);
                 if (isCollision) {
-                    m.blowUp();
-                    const wrecklesA = a.blowUp(1);
+                    bullet.blowUp();
+                    const wrecklesA = asteroid.hit(1);
                     if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
                 }
             }
@@ -738,12 +928,12 @@ class CollisionEngine {
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
         const wreckles = [];
 
-        for (let a of asteroids) {
-            for (let m of missiles) {
-                const isCollision = this.checkCollision(m, a);
+        for (let asteroid of asteroids) {
+            for (let missile of missiles) {
+                const isCollision = this.checkCollision(missile, asteroid);
                 if (isCollision) {
-                    m.blowUp();
-                    const wrecklesA = a.blowUp(100);
+                    missile.blowUp();
+                    const wrecklesA = asteroid.hit(100);
                     if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
                 }
             }
@@ -757,18 +947,14 @@ class CollisionEngine {
         const asteroids = this.figures.get().filter(f => f instanceof Asteroid && !f.getGameObject().getIsDestroyed());
         const wreckles = [];
 
-        for (let a of asteroids) {
-            for (let s of stations) {
-                const isCollision = this.checkCollision(s, a);
+        for (let asteroid of asteroids) {
+            for (let station of stations) {
+                const isCollision = this.checkCollision(station, asteroid);
                 if (isCollision) {
-                    const wrecklesA = a.blowUp();
+                    const wrecklesA = asteroid.hit();
                     if (wrecklesA && wrecklesA.length) wreckles.push(...wrecklesA);
-                    s.health -= a.getDamage();
-                    if (s.health <= 0) {
-                        s.health = 0;
-                        const wrecklesS = s.blowUp();
-                        if (wrecklesS && wrecklesS.length) wreckles.push(...wrecklesS);
-                    }
+                    const wrecklesS = station.hit(asteroid.getDamage());
+                    if (wrecklesS && wrecklesS.length) wreckles.push(...wrecklesS);
                 }
             }
         }
@@ -776,14 +962,16 @@ class CollisionEngine {
     }
 
     checkShipBeaconCollisions() {
-        const ship = this.figures.get().find(f => f instanceof Ship);
+        const ships = this.figures.get().filter(f => f instanceof Ship && !f.getGameObject().getIsDestroyed());
         const beacons = this.figures.get().filter(f => f instanceof Beacon && !f.getGameObject().getIsDestroyed());
 
-        for (let b of beacons) {
-            if (!b.getGameObject().getIsDestroyed()) {
-                const isCollision = this.checkCollision(ship, b);
-                if (isCollision) {
-                    ship.gatherBeacon(b);
+        for (let ship of ships) {
+            for (let b of beacons) {
+                if (!b.getGameObject().getIsDestroyed()) {
+                    const isCollision = this.checkCollision(ship, b);
+                    if (isCollision) {
+                        ship.gatherBeacon(b);
+                    }
                 }
             }
         }
@@ -801,11 +989,16 @@ class CollisionEngine {
     }
 
     checkShipStationCollisions() {
-        const ship = this.figures.get().find(f => f instanceof Ship);
+        const ships = this.figures.get().filter(f => f instanceof Ship && !f.getGameObject().getIsDestroyed());
         const stations = this.figures.get().filter(f => f instanceof Station && !f.getGameObject().getIsDestroyed());
 
-        for (let s of stations) {
-            s.checkCanDock(ship);
+        for (let station of stations) {
+            let stationCanDoc = false;
+            for (let ship of ships) {
+                const shipCanDock = station.checkCanDock(ship);
+                stationCanDoc = stationCanDoc || shipCanDock;
+            }
+            station.showCanDock(stationCanDoc);
         }
     }
 
@@ -845,57 +1038,6 @@ class CollisionEngine {
 }
 
 // Objects
-
-class Img {
-    constructor(x, y, angle, width, height, image) {
-        this.x = x;
-        this.y = y;
-        this.angle = angle;
-        this.width = width;
-        this.height = height;
-        this.image = image;
-    }
-}
-
-class Background {
-    constructor(width, height) {
-        this.background = new Rect(width, height, '#0F065D');
-        this.sprites = {
-            space: new Img(width / 2, height / 2, 0, width, height, imageManager.get('space')),
-            starsSmall: new Img(width / 2, height / 2, 0, width, height, imageManager.get('stars_small')),
-            starsLarge: new Img(width / 2, height / 2, 0, width, height, imageManager.get('stars_large')),
-            cloudsSmall: new Img(width / 2, height / 2, 0, width, height, imageManager.get('cloud_small')),
-            cloudsLarge: new Img(width / 2, height / 2, 0, width, height, imageManager.get('cloud_large')),
-        }
-    }
-
-    drawSprite(context, sprite) {
-        context.save();
-        context.translate(sprite.x, sprite.y);
-        context.rotate(sprite.angle);
-        context.drawImage(
-            sprite.image,
-            0, 0, sprite.width, sprite.height,
-            -sprite.width / 2, -sprite.height / 2, sprite.width, sprite.height
-        );
-        context.restore();
-    }
-
-    drawAll(context) {
-        this.background.draw(context);
-        this.drawSprite(context, this.sprites.space);
-        this.drawSprite(context, this.sprites.starsSmall);
-        this.drawSprite(context, this.sprites.starsLarge);
-        this.drawSprite(context, this.sprites.cloudsSmall);
-        this.drawSprite(context, this.sprites.cloudsLarge);
-    }
-
-    getDrawItem() {
-        return {
-            draw: context => this.drawAll(context)
-        };
-    }
-}
 
 class Ship {
     constructor(x, y, angle) {
@@ -969,6 +1111,7 @@ class Ship {
     }
 
     shoot() {
+        if (this.getGameObject().getIsDestroyed()) return;
         if (this.ammo <= 0) return null;
         const now = new Date().getTime();
         const timeout = 1000 / this.shootsPerSecond;
@@ -986,6 +1129,7 @@ class Ship {
     }
 
     launchMissile() {
+        if (this.getGameObject().getIsDestroyed()) return;
         if (this.missileCount <= 0) return null;
         const now = new Date().getTime();
         const timeout = 1000 / this.missilesPerSecond;
@@ -999,6 +1143,7 @@ class Ship {
     }
 
     turnEngineOn() {
+        if (this.getGameObject().getIsDestroyed()) return;
         if (!this.isEngineOn && !this.isDockedToStation()) {
             this.isEngineOn = true;
             this.accelerationTurnedOnAt = new Date().getTime();
@@ -1014,6 +1159,7 @@ class Ship {
     }
 
     turnEngineOff() {
+        if (this.getGameObject().getIsDestroyed()) return;
         if (this.isEngineOn) {
             this.isEngineOn = false;
             this.accelerationTurnedOnAt = new Date().getTime();
@@ -1026,14 +1172,17 @@ class Ship {
     }
 
     turnRotationLeftOn() {
+        if (this.getGameObject().getIsDestroyed()) return;
         this.getGameObject().rotateSpeed = -this.maxRotateSpeed;
     }
 
     turnRotationRightOn() {
+        if (this.getGameObject().getIsDestroyed()) return;
         this.getGameObject().rotateSpeed = this.maxRotateSpeed;
     }
 
     turnRotationOff() {
+        if (this.getGameObject().getIsDestroyed()) return;
         this.getGameObject().rotateSpeed = 0;
     }
 
@@ -1046,6 +1195,7 @@ class Ship {
     }
 
     dockToStation(station) {
+        if (this.getGameObject().getIsDestroyed()) return;
         if (station != null && !this.isDockedToStation() && !this.isDockingIsProgress()) {
             this.dockedStation = station;
             station.dockShip(this);
@@ -1063,6 +1213,7 @@ class Ship {
     }
 
     undockFromStation() {
+        if (this.getGameObject().getIsDestroyed()) return;
         if (this.isDockedToStation() && !this.isDockingIsProgress()) {
             this.dockedStation.undockShip();
             this.dockedStation = null;
@@ -1080,11 +1231,23 @@ class Ship {
     }
 
     gatherBeacon(beacon) {
+        if (this.getGameObject().getIsDestroyed()) return;
         this.beaconCount += 1;
         beacon.getGameObject().destroy();
 
         if (!this.pickUpSound) this.pickUpSound = soundManager.get('pickUp');
         this.pickUpSound.play(0.4);
+    }
+
+    hit(damage) {
+        this.health -= damage;
+        if (this.health <= 0) {
+            this.health = 0;
+            this.getGameObject().destroy();
+            this.dispose();
+            return []; // TODO: return explosion
+        }
+        return [];
     }
 }
 
@@ -1180,7 +1343,7 @@ class Asteroid {
         return this.gameObject;
     }
 
-    blowUp(power) {
+    hit(damage) {
         this.getGameObject().destroy();
 
         if (!this.explosionSound) this.explosionSound = soundManager.get('explosion');
@@ -1192,7 +1355,7 @@ class Asteroid {
         const y = this.getGameObject().y;
         wreckles.push(new Explosion(x, y, this.radius * 2));
 
-        if (power < 100 && this.radius > 20) {
+        if (damage < 100 && this.radius > 20) {
             const wreckleRadius = this.radius / 2;
             const wreckleSpeed = this.speed * 1.5;
 
@@ -1290,7 +1453,6 @@ class Station {
 
     checkCanDock(ship) {
         if (this.dockedShip != null) {
-            this.showCanDock(false);
             return false;
         }
 
@@ -1303,7 +1465,6 @@ class Station {
 
         const canDock = dx * dx + dy * dy <= dockRadius * dockRadius;
 
-        this.showCanDock(canDock);
         return canDock;
     }
 
@@ -1331,21 +1492,28 @@ class Station {
         this.undockSound.play();
     }
 
-    blowUp() {
-        this.getGameObject().destroy();
+    hit(damage) {
+        if (this.getGameObject().getIsDestroyed()) return;
+        this.health -= damage;
+        if (this.health <= 0) {
+            this.health = 0;
+            this.getGameObject().destroy();
 
-        if (!this.explosionSound) this.explosionSound = soundManager.get('explosion');
-        this.explosionSound.play();
+            if (!this.explosionSound) this.explosionSound = soundManager.get('explosion');
+            this.explosionSound.play();
 
-        const wreckles = [];
+            const wreckles = [];
 
-        const x = this.getGameObject().x;
-        const y = this.getGameObject().y;
-        wreckles.push(new Explosion(x, y, this.radius * 2));
+            const x = this.getGameObject().x;
+            const y = this.getGameObject().y;
+            wreckles.push(new Explosion(x, y, this.radius * 2));
 
-        this.undockShip();
+            this.undockShip();
 
-        return wreckles;
+            return wreckles;
+        } else {
+            return []
+        }
     }
 
     loadAmmo() {
@@ -1383,126 +1551,6 @@ class Station {
     tick() {
         this.loadAmmo();
         this.loadMissile();
-    }
-}
-
-class StatusPanel {
-    constructor(game) {
-        this.game = game;
-
-        this.shipHealth = {
-            draw: context => {
-                context.fillStyle = '#888';
-                context.font = "14px  'Courier New', Courier, monospace";
-                context.fillText(`Health: ${this.game.ship.health} / ${this.game.ship.maxHealth}`, 10, 20);
-            }
-        };
-
-        this.shipAmmo = {
-            draw: context => {
-                context.fillStyle = '#888';
-                context.font = "14px  'Courier New', Courier, monospace";
-                context.fillText(`Ammo: ${this.game.ship.ammo} / ${this.game.ship.maxAmmo}`, 170, 20);
-            }
-        };
-
-        this.shipMissiles = {
-            draw: context => {
-                context.fillStyle = '#888';
-                context.font = "14px  'Courier New', Courier, monospace";
-                context.fillText(`Missiles: ${this.game.ship.missileCount} / ${this.game.ship.maxMissiles}`, 300, 20);
-            }
-        };
-
-        this.shipBeacons = {
-            draw: context => {
-                const numOfBeacons = this.game.currentMission.numOfBeacons;
-                if (numOfBeacons) {
-                    context.fillStyle = '#888';
-                    context.font = "14px  'Courier New', Courier, monospace";
-                    context.fillText(`Beacons: ${this.game.ship.beaconCount} / ${numOfBeacons}`, 440, 20);
-                }
-            }
-        };
-
-        this.messages = {
-            draw: context => {
-                const msgs = [];
-                if (this.game.ship.ammo <= 0 && !this.game.ship.dockedStation) {
-                    msgs.push('OUT OF AMMO');
-                    msgs.push('Dock to station to charge');
-                }
-
-                const originalTextAlign = context.textAlign;
-                context.textAlign = 'center';
-                context.fillStyle = 'rgba(240,240,240,0.3)';
-                context.font = "36px  'Courier New', Courier, monospace";
-
-                let top = 80;
-                for (let m of msgs) {
-                    context.fillText(m, this.game.width / 2, top);
-                    top += 40;
-                }
-
-                context.textAlign = originalTextAlign;
-            }
-        };
-
-        this.drawItem = new CombinedDrawItem([
-            this.shipHealth,
-            this.shipAmmo,
-            this.shipMissiles,
-            this.shipBeacons,
-            this.messages,
-        ]);
-    }
-
-    getDrawItem() {
-        return this.drawItem;
-    }
-}
-
-class MissionDescription {
-    constructor(game) {
-        this.descriptionItem = {
-            draw: context => {
-                if (!this.descriptionLines) return;
-
-                const originalTextAlign = context.textAlign;
-                context.textAlign = 'start';
-                context.fillStyle = 'rgba(240,240,240,0.5)';
-
-                const headerTop = game.height - 50 - 30 * this.descriptionLines.length;
-                context.font = "28px  'Courier New', Courier, monospace";
-                context.fillText('MISSION GOAL', 20, headerTop);
-
-                context.font = "22px  'Courier New', Courier, monospace";
-                let lineNum = 0
-                for (let m of this.descriptionLines) {
-                    const top = game.height - 20 - 30 * (this.descriptionLines.length - lineNum);
-                    context.fillText(m, 20, top);
-                    lineNum += 1;
-                }
-
-                context.textAlign = originalTextAlign;
-            }
-        };
-
-        this.drawItem = new CombinedDrawItem([
-            this.descriptionItem,
-        ]);
-    }
-
-    getDrawItem() {
-        return this.drawItem;
-    }
-
-    show(descriptionLines) {
-        this.descriptionLines = descriptionLines;
-    }
-
-    hide() {
-        this.descriptionLines = null
     }
 }
 
@@ -1546,10 +1594,14 @@ class Mission {
     checkResult() {
         if (this.status != 'inProgress') return this.status;
 
-        if (this.game.ship.health <= 0) {
+        const allShips = this.game.users.map(user => user.getShip());
+        const shipsAlive = allShips.filter(ship => ship.health > 0);
+
+        if (shipsAlive.length === 0) {
             this.status = 'failed'
         } else {
-            if (this.game.ship.beaconCount === this.numOfBeacons) {
+            const numOfBeaconsGathered = allShips.map(ship => ship.beaconCount).reduce((a, b) => a + b);
+            if (numOfBeaconsGathered === this.numOfBeacons) {
                 this.status = 'succeeded'
             }
         }
@@ -1675,11 +1727,25 @@ class Mission {
 
 class User {
     constructor(name, keys) {
+        this.name = name;
         this.userControls = new UserControls(keys);
+        this.ship = null;
+    }
+
+    getName() {
+        return this.name;
     }
 
     getUserControls() {
         return this.userControls;
+    }
+
+    getShip() {
+        return this.ship;
+    }
+
+    setShip(ship) {
+        this.ship = ship;
     }
 }
 
@@ -1688,7 +1754,16 @@ class Game {
         this.intervalHandle = null;
         this.calcFrequency = 60; // 60 раз в секунду
 
-        this.userControls = new UserControls();
+        this.users = [];
+        this.users.push(new User('Player 1', {
+            MOVE: 'ArrowUp',
+            LEFT: 'ArrowLeft',
+            RIGHT: 'ArrowRight',
+            SHOOT: 'KeyD',
+            LAUNCH: 'KeyS',
+            DOCK: 'KeyA',
+        }));
+
         this.figures = new Figures();
 
         this.width = w || 1024;
@@ -1769,6 +1844,7 @@ class Game {
     }
 
     processUserControl(ship, userControls) {
+        if (ship.getGameObject().getIsDestroyed()) return;
         const k = userControls.state;
 
         // Rotate
@@ -1819,7 +1895,9 @@ class Game {
     //-------------------------------------------------------------------------
     // PERFORMING
     performAll() {
-        this.processUserControl(this.ship, this.userControls);
+        this.users.forEach(user => {
+            this.processUserControl(user.getShip(), user.getUserControls());
+        });
         this.physicsEngine.moveAll();
         this.renderEngine.drawFrame();
 
@@ -1860,13 +1938,27 @@ class Game {
 
         const background = new Background(this.width, this.height);
         const missionObjects = this.currentMission.getObjects();
-        this.ship = new Ship(this.width / 2 + 250, this.height / 2, 0);
+
+        this.users.forEach(user => {
+            const minX = this.width / 2 - 250;
+            const maxX = this.width / 2 + 250;
+            const minY = this.height / 2 - 100;
+            const maxY = this.height / 2 + 100;
+
+            const x = Math.round(Math.random() * (maxX - minX) + minX);
+            const y = Math.round(Math.random() * (maxY - minY) + minY);
+
+            const ship = new Ship(x, y, 0);
+            user.setShip(ship);
+        });
 
         // Order of adding figures is important to render properly
         this.figures.set([]);
         this.addFigure(background);
         missionObjects.forEach(o => this.addFigure(o));
-        this.addFigure(this.ship);
+        this.users.forEach(user => {
+            this.addFigure(user.getShip());
+        });
 
         this.physicsEngine.reset();
         this.startMusic();
@@ -1881,7 +1973,10 @@ class Game {
             this.currentMission.interrupt();
         }
 
-        if (this.ship) this.ship.dispose();
+        this.users.forEach(user => {
+            const ship = user.getShip();
+            if (ship) ship.dispose();
+        });
 
         this.stopMusic();
     }
