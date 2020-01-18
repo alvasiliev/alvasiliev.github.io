@@ -120,7 +120,7 @@ export class StatusPanel {
                                 }
                             }
                         }
-                    } else {
+                    } else if (this.game.players.length === 1) {
                         context.font = "36px  'Courier New', Courier, monospace";
                         const ship = this.game.players[0].getShip();
                         if (ship && !ship.getGameObject().getIsDestroyed()) {
@@ -147,7 +147,7 @@ export class StatusPanel {
 
         this.duration = {
             draw: context => {
-                if (!this.game.currentMission.getRequiredDuration) return;
+                if (!this.game.currentMission || !this.game.currentMission.getRequiredDuration) return;
 
                 let durationLeft = this.game.currentMission.getRequiredDuration() - this.game.currentMission.getMissionDuration();
                 if (durationLeft < 0) durationLeft = 0;
