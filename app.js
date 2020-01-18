@@ -550,7 +550,7 @@ class CampaignFinishedScreen {
         context.textAlign = 'center';
         context.fillStyle = '#ddd';
         context.font = "48px 'Courier New', Courier, monospace";
-        context.fillText("COMPAING FINISHED", this.width / 2, this.height / 2 - 50);
+        context.fillText("CAMPAING FINISHED", this.width / 2, this.height / 2 - 50);
 
         context.fillStyle = '#aaa';
         context.font = "18px 'Courier New', Courier, monospace";
