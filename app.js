@@ -34,6 +34,7 @@ class Game {
         this.playerManager = new PlayerManager();
         this.statusPanel = new StatusPanel(this);
         this.missionDescription = new MissionDescription(this);
+        this.missionDescriptionTimeoutHandler = null;
         this.renderEngine = new RenderEngine(this.width, this.height, this.figures, [
             this.statusPanel,
             this.missionDescription,
@@ -268,9 +269,13 @@ class Game {
     }
 
     showMissionDescription() {
+        if (this.missionDescriptionTimeoutHandler) {
+            clearTimeout(this.missionDescriptionTimeoutHandler);
+        }
         this.missionDescription.show(this.currentMission.getDescription());
-        setTimeout(() => {
+        this.missionDescriptionTimeoutHandler = setTimeout(() => {
             this.missionDescription.hide();
+            this.missionDescriptionTimeoutHandler = null;
         }, 3000);
     }
 
