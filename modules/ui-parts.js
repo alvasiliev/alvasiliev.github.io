@@ -1,5 +1,6 @@
 import {
-    Img,
+    Circle,
+    Sprite,
     Rect,
     CombinedDrawItem,
 } from './primitives.js'
@@ -8,41 +9,99 @@ import imageManager from './managers/imageManager.js';
 
 export class Background {
     constructor(width, height) {
-        this.background = new Rect(width, height, '#0F065D');
-        this.sprites = {
-            space: new Img(width / 2, height / 2, 0, width, height, imageManager.get('space')),
-            starsSmall: new Img(width / 2, height / 2, 0, width, height, imageManager.get('stars_small')),
-            starsLarge: new Img(width / 2, height / 2, 0, width, height, imageManager.get('stars_large')),
-            cloudsSmall: new Img(width / 2, height / 2, 0, width, height, imageManager.get('cloud_small')),
-            cloudsLarge: new Img(width / 2, height / 2, 0, width, height, imageManager.get('cloud_large')),
+        this.width = width;
+        this.height = height;
+
+        const background = new Rect(width, height, '#0a063a');
+        const space = new Sprite(imageManager.get('space'), width, height, {
+            x: width / 2,
+            y: height / 2,
+        });
+        const clouds = this._generateClouds();
+        const smallStars = this._generateSmallStars();
+        const largeStars = this._generateLargeStars();
+
+        this.drawItem = new CombinedDrawItem([
+            background,
+            space,
+            ...clouds,
+            ...smallStars,
+            ...largeStars,
+        ]);
+    }
+
+    _generateClouds() {
+        const minW = 100,
+            maxW = 950;
+        const maxH = 600;
+        const clouds = [];
+        const cloudsCount = Math.trunc(this.width * this.height / 260000);
+
+        for (let i = 0; i < cloudsCount; ++i) {
+            const w = Math.round(Math.random() * (maxW - minW) + minW);
+            const scale = w / maxW;
+            const h = Math.round(maxH * scale);
+
+            const x = Math.random() * this.width;
+            const y = Math.random() * this.height;
+
+            const cloud = new Sprite(imageManager.get('cloud'), w, h, {
+                x,
+                y,
+            });
+            clouds.push(cloud);
         }
+
+        return clouds;
     }
 
-    drawSprite(context, sprite) {
-        context.save();
-        context.translate(sprite.x, sprite.y);
-        context.rotate(sprite.angle);
-        context.drawImage(
-            sprite.image,
-            0, 0, sprite.width, sprite.height,
-            -sprite.width / 2, -sprite.height / 2, sprite.width, sprite.height
-        );
-        context.restore();
+    _generateSmallStars() {
+        const width = this.width,
+            height = this.height;
+        const startsCount = Math.trunc(width * height / 15000);
+
+        const stars = [];
+        const minRadius = 1;
+        const maxRadius = 3;
+
+        for (let i = 0; i < startsCount; ++i) {
+            const r = Math.round(Math.random() * (maxRadius - minRadius) + minRadius);
+            const x = Math.round(Math.random() * width);
+            const y = Math.round(Math.random() * height);
+
+            const drawItem = new Circle(r, '#8380a9', {
+                x,
+                y,
+            })
+
+            stars.push(drawItem);
+        }
+        return stars;
     }
 
-    drawAll(context) {
-        this.background.draw(context);
-        this.drawSprite(context, this.sprites.space);
-        this.drawSprite(context, this.sprites.starsSmall);
-        this.drawSprite(context, this.sprites.starsLarge);
-        this.drawSprite(context, this.sprites.cloudsSmall);
-        this.drawSprite(context, this.sprites.cloudsLarge);
+    _generateLargeStars() {
+        const width = this.width,
+            height = this.height;
+        const startsCount = Math.trunc(width * height / 70000);
+
+        const stars = [];
+        const minRadius = 3;
+        const maxRadius = 4;
+
+        for (let i = 0; i < startsCount; ++i) {
+            const r = Math.round(Math.random() * (maxRadius - minRadius) + minRadius);
+            const x = Math.round(Math.random() * width);
+            const y = Math.round(Math.random() * height);
+
+            const drawItem = new Rect(r * 2, r * 2, '#c1bfd3', x, y, Math.PI / 4);
+
+            stars.push(drawItem);
+        }
+        return stars;
     }
 
     getDrawItem() {
-        return {
-            draw: context => this.drawAll(context)
-        };
+        return this.drawItem;
     }
 }
 

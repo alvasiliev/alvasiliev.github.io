@@ -4,10 +4,7 @@ export class ImageManager {
         this.loadedCount = 0;
         this.imgList = [
             'space',
-            'stars_small',
-            'stars_large',
-            'cloud_small',
-            'cloud_large',
+            'cloud',
             'ship',
             'shipFire',
             'bullet',

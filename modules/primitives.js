@@ -57,29 +57,31 @@ export class Sprite {
     }
 }
 
-export class Img {
-    constructor(x, y, angle, width, height, image) {
-        this.x = x;
-        this.y = y;
-        this.angle = angle;
-        this.width = width;
-        this.height = height;
-        this.image = image;
-    }
-}
-
 export class Rect {
-    constructor(width, height, color, leftX, topY) {
+    constructor(width, height, color, leftX, topY, angle) {
         this.width = width;
         this.height = height;
         this.color = color;
         this.leftX = leftX || 0;
         this.topY = topY || 0;
+        this.angle = angle || 0;
     }
 
     draw(context) {
         context.fillStyle = this.color;
-        context.fillRect(this.leftX, this.topY, this.width, this.height);
+        if (!this.angle) {
+            context.fillRect(this.leftX, this.topY, this.width, this.height);
+        } else {
+            const w2 = this.width / 2;
+            const h2 = this.height / 2;
+            const x = this.leftX + w2;
+            const y = this.topY + h2;
+            context.save();
+            context.translate(x, y);
+            context.rotate(this.angle);
+            context.fillRect(-w2, -h2, this.width, this.height);
+            context.restore();
+        }
     }
 }
 
