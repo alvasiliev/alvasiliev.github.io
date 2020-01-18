@@ -336,6 +336,38 @@ class Game {
 
 // Initialization
 
-const w = window.innerWidth,
-    h = window.innerHeight;
-const game = new Game(imageManager, soundManager, w, h);
+function setFullscreen() {
+    var el = document.documentElement,
+        rfs = // for newer Webkit and Firefox
+        el.requestFullScreen ||
+        el.webkitRequestFullScreen ||
+        el.mozRequestFullScreen ||
+        el.msRequestFullScreen;
+    if (typeof rfs != "undefined" && rfs) {
+        rfs.call(el);
+    } else if (typeof window.ActiveXObject != "undefined") {
+        // for Internet Explorer
+        var wscript = new ActiveXObject("WScript.Shell");
+        if (wscript != null) {
+            wscript.SendKeys("{F11}");
+        }
+    }
+}
+
+window.initGame = function (isFullScreen) {
+    window.document.getElementById('startScreen').style.display = "none";
+    if (isFullScreen) {
+        setFullscreen();
+        setTimeout(() => {
+            const w = window.innerWidth,
+                h = window.innerHeight;
+            const game = new Game(imageManager, soundManager, w, h);
+        }, 500);
+    } else {
+        const w = window.innerWidth,
+            h = window.innerHeight;
+        const game = new Game(imageManager, soundManager, w, h);
+    }
+}
+document.getElementById("startScreen").style.display = "block";
+initGame(false);
