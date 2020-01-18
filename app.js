@@ -632,6 +632,7 @@ class SoundManager {
             'dock',
             'undock',
             'pickUp',
+            'pickAmmo',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
@@ -694,6 +695,7 @@ class ImageManager {
             'missile',
             'missileFire',
             'beacon',
+            'supplyPackage',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
@@ -1062,6 +1064,20 @@ class CollisionEngine {
         }
     }
 
+    checkShipSupplyPackageCollisions() {
+        const ships = this.figures.get().filter(f => f instanceof Ship && !f.getGameObject().getIsDestroyed());
+        const packages = this.figures.get().filter(f => f instanceof SupplyPackage && !f.getGameObject().getIsDestroyed());
+
+        for (let ship of ships) {
+            for (let pack of packages) {
+                const isCollision = this.checkCollision(ship, pack);
+                if (isCollision) {
+                    ship.pickSupplyPackage(pack);
+                }
+            }
+        }
+    }
+
     checkCollision(go1, go2) {
         const go1Radius = go1.getGameObject().width / 2;
         const go1X = go1.getGameObject().x;
@@ -1088,6 +1104,7 @@ class CollisionEngine {
         const newFigures4 = this.checkShipAsteriodCollisions();
         this.checkShipBeaconCollisions();
         this.checkShipStationCollisions();
+        this.checkShipSupplyPackageCollisions();
         return [
             ...newFigures1,
             ...newFigures2,
@@ -1184,6 +1201,7 @@ class Ship {
         this.health = 100;
         this.maxAmmo = 30;
         this.ammo = 30;
+        this.pickAmmoSound = null;
 
         this.isDockingInProgress = false;
         this.dockedStation = null;
@@ -1354,6 +1372,18 @@ class Ship {
 
         if (!this.pickUpSound) this.pickUpSound = soundManager.get('pickUp');
         this.pickUpSound.play(0.4);
+    }
+
+    pickSupplyPackage(pack) {
+        if (this.ammo < this.maxAmmo) {
+            const requiredAmmo = this.maxAmmo - this.ammo;
+            const packAmmo = pack.getAmmo();
+            const ammoToLoad = packAmmo < requiredAmmo ? packAmmo : requiredAmmo;
+            this.ammo += ammoToLoad;
+            pack.gameObject.destroy();
+            if (!this.pickAmmoSound) this.pickAmmoSound = soundManager.get('pickAmmo');
+            this.pickAmmoSound.play();
+        }
     }
 
     hit(damage) {
@@ -1695,6 +1725,47 @@ class Beacon {
     }
 }
 
+class SupplyPackage {
+    constructor(x, y, angle, speed) {
+        this.radius = 20;
+        this.width = this.radius * 2;
+        this.height = this.radius * 2;
+        this.speed = speed;
+        this.gameObject = new GameObject(x, y, this.width, this.height, angle, this.speed, 0, false);
+
+        const startFrameNumber = Math.round(Math.random() * 100);
+        this.drawItemSprite = new AnimatedSprite(imageManager.get('supplyPackage'), this.radius * 2, this.radius * 2, 50, 50, this.gameObject, 250, 1, true, null, 0, 0, startFrameNumber);
+        this.drawItemAmmo = {
+            draw: context => {
+                const originalTextAlign = context.textAlign;
+                context.textAlign = 'center';
+                context.fillStyle = '#888';
+                context.font = "10px  'Courier New', Courier, monospace";
+                context.fillText(this.getAmmo(), this.gameObject.x, this.gameObject.y - this.radius - 3);
+                context.textAlign = originalTextAlign;
+            }
+        };
+        this.drawItem = new CombinedDrawItem([
+            this.drawItemSprite,
+            this.drawItemAmmo,
+        ]);
+
+        this.ammo = 10;
+    }
+
+    getDrawItem() {
+        return this.drawItem;
+    }
+
+    getGameObject() {
+        return this.gameObject;
+    }
+
+    getAmmo() {
+        return this.ammo;
+    }
+}
+
 // Game
 
 class Campaign {
@@ -1720,6 +1791,7 @@ class Mission1 {
     constructor(game) {
         this.game = game;
         this.status = 'inProgress'; // inProgress, succeeded, failed, interrupted
+        this.missionGenerator = new MissionGenerator(game);
 
         this.numOfAsteroids = 5;
 
@@ -1775,52 +1847,11 @@ class Mission1 {
     }
 
     _generate() {
-        return this._generateAsteroids(this.numOfAsteroids, this.game.width, this.game.height);
+        return this.missionGenerator.generateAsteroids(this.numOfAsteroids);
     }
 
-    _generateAsteroids(asteroidsCount, width, height) {
-        const asteroids = [];
-        const minRadius = 20;
-        const maxRadius = 70;
-        const minSpeed = 1;
-        const maxSpeed = 20;
-        const maxSpin = 0.5;
-        for (let i = 0; i < asteroidsCount; ++i) {
-            const rand = Math.random();
-            const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
-            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
-            const pos = this._getRandomStartPosition(width, height);
-            const angle = Math.random() * 360 * Math.PI / 180;
-            const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
-
-            const a = new Asteroid(pos.x, pos.y, angle, radius, speed, spinSpeed);
-            asteroids.push(a);
-        }
-        return asteroids;
-    }
-
-    _getRandomStartPosition(width, height) {
-        const linearPos = Math.trunc((width + height) * 2 * Math.random());
-
-        let x, y;
-        if (linearPos < width) {
-            x = linearPos;
-            y = 0;
-        } else if (linearPos < width + height) {
-            x = width;
-            y = linearPos - width;
-        } else if (linearPos < width * 2 + height) {
-            x = linearPos - width - height;
-            y = height;
-        } else {
-            x = 0;
-            y = linearPos - width * 2 - height;
-        }
-
-        return {
-            x,
-            y
-        }
+    tick() {
+        this.missionGenerator.supplyPackagesIfRequired();
     }
 }
 
@@ -1828,6 +1859,7 @@ class Mission2 {
     constructor(game) {
         this.game = game;
         this.status = 'inProgress'; // inProgress, succeeded, failed, interrupted
+        this.missionGenerator = new MissionGenerator(game);
 
         this.numOfAsteroids = 5;
         this.numOfBeacons = 3;
@@ -1886,9 +1918,9 @@ class Mission2 {
     }
 
     _generate() {
-        const asteroids = this._generateAsteroids(this.numOfAsteroids, this.game.width, this.game.height);
-        const stations = this._generateStations(this.game.width, this.game.height);
-        const beacons = this._generateBeacons(this.numOfBeacons, this.game.width, this.game.height);
+        const asteroids = this.missionGenerator.generateAsteroids(this.numOfAsteroids);
+        const stations = this.missionGenerator.generateStations();
+        const beacons = this.missionGenerator.generateBeacons(this.numOfBeacons);
         return [
             ...asteroids,
             ...stations,
@@ -1896,76 +1928,8 @@ class Mission2 {
         ];
     }
 
-    _generateAsteroids(asteroidsCount, width, height) {
-        const asteroids = [];
-        const minRadius = 20;
-        const maxRadius = 70;
-        const minSpeed = 1;
-        const maxSpeed = 20;
-        const maxSpin = 0.5;
-        for (let i = 0; i < asteroidsCount; ++i) {
-            const rand = Math.random();
-            const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
-            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
-            const pos = this._getRandomStartPosition(width, height);
-            const angle = Math.random() * 360 * Math.PI / 180;
-            const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
-
-            const a = new Asteroid(pos.x, pos.y, angle, radius, speed, spinSpeed);
-            asteroids.push(a);
-        }
-        return asteroids;
-    }
-
-    _generateStations(width, height) {
-        const stations = [];
-
-        const x = width / 2;
-        const y = height / 2;
-        const s = new Station(x, y);
-        stations.push(s);
-
-        return stations;
-    }
-
-    _generateBeacons(totalBeaconCount, width, height) {
-        const beacons = [];
-        const minSpeed = 1;
-        const maxSpeed = 20;
-        for (let i = 0; i < totalBeaconCount; ++i) {
-            const rand = Math.random();
-            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
-            const pos = this._getRandomStartPosition(width, height);
-            const angle = Math.random() * 360 * Math.PI / 180;
-
-            const b = new Beacon(pos.x, pos.y, angle, speed);
-            beacons.push(b);
-        }
-        return beacons;
-    }
-
-    _getRandomStartPosition(width, height) {
-        const linearPos = Math.trunc((width + height) * 2 * Math.random());
-
-        let x, y;
-        if (linearPos < width) {
-            x = linearPos;
-            y = 0;
-        } else if (linearPos < width + height) {
-            x = width;
-            y = linearPos - width;
-        } else if (linearPos < width * 2 + height) {
-            x = linearPos - width - height;
-            y = height;
-        } else {
-            x = 0;
-            y = linearPos - width * 2 - height;
-        }
-
-        return {
-            x,
-            y
-        }
+    tick() {
+        this.missionGenerator.supplyPackagesIfRequired();
     }
 }
 
@@ -1973,6 +1937,7 @@ class Mission3 {
     constructor(game) {
         this.game = game;
         this.status = 'inProgress'; // inProgress, succeeded, failed, interrupted
+        this.missionGenerator = new MissionGenerator(game);
 
         this.numOfAsteroids = 35;
         this.requiredDuration = 30;
@@ -2032,52 +1997,7 @@ class Mission3 {
     }
 
     _generate() {
-        return this._generateAsteroids(this.numOfAsteroids, this.game.width, this.game.height);
-    }
-
-    _generateAsteroids(asteroidsCount, width, height) {
-        const asteroids = [];
-        const minRadius = 10;
-        const maxRadius = 15;
-        const minSpeed = 20;
-        const maxSpeed = 30;
-        const maxSpin = 0.5;
-        for (let i = 0; i < asteroidsCount; ++i) {
-            const rand = Math.random();
-            const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
-            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
-            const pos = this._getRandomStartPosition(width, height);
-            const angle = Math.random() * 360 * Math.PI / 180;
-            const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
-
-            const a = new Asteroid(pos.x, pos.y, angle, radius, speed, spinSpeed);
-            asteroids.push(a);
-        }
-        return asteroids;
-    }
-
-    _getRandomStartPosition(width, height) {
-        const linearPos = Math.trunc((width + height) * 2 * Math.random());
-
-        let x, y;
-        if (linearPos < width) {
-            x = linearPos;
-            y = 0;
-        } else if (linearPos < width + height) {
-            x = width;
-            y = linearPos - width;
-        } else if (linearPos < width * 2 + height) {
-            x = linearPos - width - height;
-            y = height;
-        } else {
-            x = 0;
-            y = linearPos - width * 2 - height;
-        }
-
-        return {
-            x,
-            y
-        }
+        return this.missionGenerator.generateAsteroids(this.numOfAsteroids, 10, 20, 10, 25);
     }
 
     pause() {
@@ -2099,6 +2019,124 @@ class Mission3 {
 
     getMissionDuration() {
         return (new Date().getTime() - this.missionStartedAt - this.pauseDuration) / 1000;
+    }
+
+    tick() {
+        this.missionGenerator.supplyPackagesIfRequired();
+    }
+}
+
+class MissionGenerator {
+    constructor(game) {
+        this.game = game;
+        this.packageSuppiedAt = null;
+        this.supplyDelay = 10; // 10 seconds between supplies
+    }
+
+    generateAsteroids(asteroidsCount, minR, maxR, minS, maxS) {
+        const asteroids = [];
+        const minRadius = minR || 20;
+        const maxRadius = maxR || 70;
+        const minSpeed = minS || 1;
+        const maxSpeed = maxS || 20;
+        const maxSpin = 0.5;
+        for (let i = 0; i < asteroidsCount; ++i) {
+            const rand = Math.random();
+            const radius = Math.trunc(rand * (maxRadius - minRadius) + minRadius);
+            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
+            const pos = this._getRandomStartPosition();
+            const angle = Math.random() * 360 * Math.PI / 180;
+            const spinSpeed = ((1 - rand) * maxSpin * 2) - maxSpin;
+
+            const a = new Asteroid(pos.x, pos.y, angle, radius, speed, spinSpeed);
+            asteroids.push(a);
+        }
+        return asteroids;
+    }
+
+    generatePackages(packageCount) {
+        const packages = [];
+        const minSpeed = 1;
+        const maxSpeed = 5;
+        for (let i = 0; i < packageCount; ++i) {
+            const rand = Math.random();
+            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
+            const pos = this._getRandomStartPosition();
+            const angle = Math.random() * 360 * Math.PI / 180;
+
+            const p = new SupplyPackage(pos.x, pos.y, angle, speed);
+            packages.push(p);
+        }
+        return packages;
+    }
+
+    generateBeacons(totalBeaconCount) {
+        const beacons = [];
+        const minSpeed = 1;
+        const maxSpeed = 20;
+        for (let i = 0; i < totalBeaconCount; ++i) {
+            const rand = Math.random();
+            const speed = (maxSpeed - minSpeed) * (1 - rand) + minSpeed;
+            const pos = this._getRandomStartPosition();
+            const angle = Math.random() * 360 * Math.PI / 180;
+
+            const b = new Beacon(pos.x, pos.y, angle, speed);
+            beacons.push(b);
+        }
+        return beacons;
+    }
+
+    generateStations() {
+        const width = this.game.width,
+            height = this.game.height;
+        const stations = [];
+
+        const x = width / 2;
+        const y = height / 2;
+        const s = new Station(x, y);
+        stations.push(s);
+
+        return stations;
+    }
+
+    supplyPackagesIfRequired() {
+        const playersWithoutAmmo = this.game.players.map(p => p.getShip()).filter(ship => ship.ammo <= 0 && ship.maxAmmo);
+        const packages = this.game.figures.get().filter(f => f instanceof SupplyPackage && !f.gameObject.getIsDestroyed());
+        const stations = this.game.figures.get().filter(f => f instanceof Station && !f.gameObject.getIsDestroyed());
+        if (playersWithoutAmmo.length > 0 && packages.length === 0 && stations.length == 0) {
+            const now = new Date().getTime();
+            const timeToSupply = this.packageSuppiedAt == null || this.packageSuppiedAt + this.supplyDelay * 1000 < now;
+            if (timeToSupply) {
+                const packages = this.generatePackages(3);
+                packages.forEach(p => this.game.addFigure(p));
+            }
+        }
+    }
+
+    _getRandomStartPosition() {
+        const width = this.game.width,
+            height = this.game.height;
+        const linearPos = Math.trunc((width + height) * 2 * Math.random());
+
+        let x, y;
+        if (linearPos < width) {
+            x = linearPos;
+            y = 0;
+        } else if (linearPos < width + height) {
+            x = width;
+            y = linearPos - width;
+        } else if (linearPos < width * 2 + height) {
+            x = linearPos - width - height;
+            y = height;
+        } else {
+            x = 0;
+            y = linearPos - width * 2 - height;
+        }
+
+        return {
+            x,
+            y
+        }
     }
 }
 
@@ -2210,6 +2248,7 @@ class Game {
 
     stop() {
         this.stopMission();
+        this.nextMissionNumber = 0;
         this.renderEngine.drawFrame();
         this.renderEngine.drawSplashScreen();
     }
@@ -2289,6 +2328,7 @@ class Game {
         this.checkGameResult();
 
         this.figures.get().filter(f => f.tick).forEach(f => f.tick());
+        if (this.currentMission.tick) this.currentMission.tick();
     }
 
     startPerforming() {
