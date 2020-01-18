@@ -20,6 +20,8 @@ import PlayerManager from './modules/managers/PlayerManager.js';
 import Player from './modules/Player.js';
 import Campaign from './modules/missions/Campaign.js';
 
+import TouchControls from './modules/TouchControls.js'
+
 class Game {
     constructor(imageManager, soundManager, w, h) {
         this.intervalHandle = null;
@@ -35,9 +37,12 @@ class Game {
         this.statusPanel = new StatusPanel(this);
         this.missionDescription = new MissionDescription(this);
         this.missionDescriptionTimeoutHandler = null;
+
+        this.touchControls = new TouchControls(this.width, this.height);
         this.renderEngine = new RenderEngine(this.width, this.height, this.figures, [
             this.statusPanel,
             this.missionDescription,
+            this.touchControls,
         ]);
         this.physicsEngine = new PhysicsEngine(this.width, this.height, this.figures);
         this.collisionEngine = new CollisionEngine(this.figures);
@@ -47,6 +52,9 @@ class Game {
         this.campaign = new Campaign();
         this.nextMissionNumber = 0;
         this.currentMission = null;
+
+        this.touchControls.init(this.renderEngine.canvas);
+        this.isTouchControls = false;
 
         this.renderEngine.drawSplashScreen(true);
         imageManager.onLoadFinished = () => {
@@ -85,6 +93,16 @@ class Game {
                 this.stop();
             }
         }.bind(this));
+
+        this.touchControls.onEnter(function () {
+            this.isTouchControls = true;
+            this.touchControls.setIsVisible(true);
+            if (!this.intervalHandle) {
+                this.start();
+            } else {
+                this.pause();
+            }
+        }.bind(this));
     }
 
     start() {
@@ -117,7 +135,7 @@ class Game {
 
     processUserControl(ship, userControls) {
         if (ship.getGameObject().getIsDestroyed()) return;
-        const k = userControls.state;
+        const k = userControls.getState();
 
         // Rotate
         if (k.LEFT && !k.RIGHT) {
@@ -168,7 +186,11 @@ class Game {
     // PERFORMING
     performAll() {
         this.players.forEach(player => {
-            this.processUserControl(player.getShip(), player.getUserControls());
+            if (this.isTouchControls) {
+                this.processUserControl(player.getShip(), this.touchControls);
+            } else {
+                this.processUserControl(player.getShip(), player.getUserControls());
+            }
         });
         this.physicsEngine.moveAll();
         this.renderEngine.drawFrame();
@@ -370,4 +392,4 @@ window.initGame = function (isFullScreen) {
     }
 }
 document.getElementById("startScreen").style.display = "block";
-initGame(false);
+// initGame(false);

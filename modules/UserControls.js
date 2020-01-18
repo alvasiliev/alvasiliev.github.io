@@ -53,4 +53,8 @@ export default class UserControls {
         document.removeEventListener('keydown', this.onKeyDownHandler);
         document.removeEventListener('keyup', this.onKeyUpHandler);
     }
+
+    getState() {
+        return this.state;
+    }
 }

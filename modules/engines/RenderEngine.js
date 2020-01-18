@@ -13,6 +13,7 @@ export default class RenderEngine {
         this.userInterfaceItems = userInterfaceItems;
 
         const canvas = document.createElement('canvas');
+        this.canvas = canvas;
         canvas.width = viewportWidth;
         canvas.height = viewportHeight;
         document.getElementById('root').append(canvas);
