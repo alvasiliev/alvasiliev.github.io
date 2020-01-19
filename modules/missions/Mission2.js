@@ -74,10 +74,10 @@ export default class Mission2 {
     }
 
     generateShipPosition() {
-        const minX = this.width / 2 - 250;
-        const maxX = this.width / 2 + 250;
-        const minY = this.height / 2 - 100;
-        const maxY = this.height / 2 + 100;
+        const minX = this.game.width / 2 - 250;
+        const maxX = this.game.width / 2 + 250;
+        const minY = this.game.height / 2 - 100;
+        const maxY = this.game.height / 2 + 100;
 
         const x = Math.round(Math.random() * (maxX - minX) + minX);
         const y = Math.round(Math.random() * (maxY - minY) + minY);

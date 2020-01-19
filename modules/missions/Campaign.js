@@ -6,9 +6,6 @@ import Mission4 from './Mission4.js';
 export default class Campaign {
     constructor() {
         this.missions = [{
-            name: 'Mission 4',
-            create: game => new Mission4(game)
-        }, {
             name: 'Mission 1',
             create: game => new Mission1(game)
         }, {
@@ -17,6 +14,9 @@ export default class Campaign {
         }, {
             name: 'Mission 3',
             create: game => new Mission3(game)
+        }, {
+            name: 'Mission 4',
+            create: game => new Mission4(game)
         }];
     }
 

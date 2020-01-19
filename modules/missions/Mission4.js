@@ -1,5 +1,6 @@
 import MissionGenerator from './MissionGenerator.js';
 import BlackHole from '../gameObjects/BlackHole.js';
+import Asteroid from '../gameObjects/Asteroid.js';
 
 export default class Mission4 {
     constructor(game) {
@@ -21,7 +22,10 @@ export default class Mission4 {
         if (shipsAlive.length === 0) {
             this.status = 'failed'
         } else {
-
+            const asteroids = this.game.figures.get().filter(obj => obj instanceof Asteroid && !obj.getGameObject().getIsDestroyed());
+            if (asteroids.length === 0) {
+                this.status = 'succeeded'
+            }
         }
 
         return this.status;
@@ -49,6 +53,7 @@ export default class Mission4 {
 
     getDescription() {
         return [
+            'Destroy all the asteroids',
             `Avoid black hole - there is no way back from it`
         ];
     }
