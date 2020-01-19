@@ -7,7 +7,7 @@ export default class Mission4 {
         this.status = 'inProgress'; // inProgress, succeeded, failed, interrupted
         this.missionGenerator = new MissionGenerator(game);
 
-        this.numOfAsteroids = 0;
+        this.numOfAsteroids = 5;
 
         this.objects = this._generate();
     }
@@ -16,12 +16,12 @@ export default class Mission4 {
         if (this.status != 'inProgress') return this.status;
 
         const allShips = this.game.players.map(player => player.getShip());
-        const shipsAlive = allShips.filter(ship => ship.health > 0);
+        const shipsAlive = allShips.filter(ship => ship.health > 0 && !ship.getGameObject().getIsDestroyed());
 
         if (shipsAlive.length === 0) {
             this.status = 'failed'
         } else {
-            
+
         }
 
         return this.status;
@@ -49,7 +49,7 @@ export default class Mission4 {
 
     getDescription() {
         return [
-            `Just chill out`
+            `Avoid black hole - there is no way back from it`
         ];
     }
 
@@ -58,11 +58,38 @@ export default class Mission4 {
     }
 
     _generate() {
-        const d = this.game.width < this.game.height ? this.game.width : this.game.height;
-        const blackHole = new BlackHole(this.game.width / 2, this.game.height / 2, d / 2.1, -0.0025);
+        const r = this._getBlackHoleRadius();
+        const blackHole = new BlackHole(this.game.width / 2, this.game.height / 2, r, -0.0025);
+        const asteroids = this.missionGenerator.generateAsteroids(this.numOfAsteroids);
         return [
             blackHole,
+            ...asteroids,
         ]
+    }
+
+    _getBlackHoleRadius() {
+        const w = this.game.width,
+            h = this.game.height;
+        const d = w < h ? w : h;
+        const r = d / 2 - 60;
+        const radius = r < 500 ? r : 500;
+        return radius;
+    }
+
+    generateShipPosition() {
+        const w = this.game.width,
+            h = this.game.height;
+        const r = this._getBlackHoleRadius() + 35;
+        const a = Math.PI * 2 * Math.random();
+
+        const x = w / 2 + r * Math.cos(a);
+        const y = h / 2 + r * Math.sin(a);
+        const angle = Math.random() * Math.PI * 2;
+        return {
+            x,
+            y,
+            angle,
+        }
     }
 
     tick() {

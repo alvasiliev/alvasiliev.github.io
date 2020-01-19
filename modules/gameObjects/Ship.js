@@ -30,7 +30,6 @@ export default class Ship {
 
         this.missilesPerSecond = 1; // Скорострельность: 1 ракета в секунду
         this.missileLaunchedAt = null;
-        this.missileSound = null;
         this.maxMissiles = 5;
         this.missileCount = 5;
 
@@ -67,6 +66,11 @@ export default class Ship {
 
         this.gameObject.getRotateSpeed = () => {
             return this.gameObject.rotateSpeed;
+        }
+
+        this.gameObject.destroy = () => {
+            this.gameObject.isDestroyed = true;
+            if (this.engineSound != null) this.engineSound.stop();
         }
     }
 

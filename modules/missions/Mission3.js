@@ -88,6 +88,22 @@ export default class Mission3 {
         return (new Date().getTime() - this.missionStartedAt - this.pauseDuration) / 1000;
     }
 
+    generateShipPosition() {
+        const minX = this.width / 2 - 250;
+        const maxX = this.width / 2 + 250;
+        const minY = this.height / 2 - 100;
+        const maxY = this.height / 2 + 100;
+
+        const x = Math.round(Math.random() * (maxX - minX) + minX);
+        const y = Math.round(Math.random() * (maxY - minY) + minY);
+        const angle = Math.random() * Math.PI * 2;
+        return {
+            x,
+            y,
+            angle,
+        }
+    }
+
     tick() {
         this.missionGenerator.supplyPackagesIfRequired();
     }

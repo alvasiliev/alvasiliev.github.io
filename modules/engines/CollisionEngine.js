@@ -5,6 +5,7 @@ import Missile from '../gameObjects/Missile.js';
 import Ship from '../gameObjects/Ship.js';
 import Station from '../gameObjects/Station.js';
 import SupplyPackage from '../gameObjects/SupplyPackage.js';
+import BlackHole from '../gameObjects/BlackHole.js';
 
 export default class CollisionEngine {
     constructor(figures) {
@@ -144,6 +145,16 @@ export default class CollisionEngine {
         }
     }
 
+    checkBlackHoleCollisions() {
+        const objects = this.figures.get().filter(f => !(f instanceof BlackHole) && f.getGameObject && !f.getGameObject().getIsDestroyed());
+        const blackHoles = this.figures.get().filter(f => f instanceof BlackHole && !f.getGameObject().getIsDestroyed());
+
+        for (let blackHole of blackHoles) {
+            const affectedObjects = objects.filter(obj => this.checkCollision(obj, blackHole));
+            blackHole.affect(affectedObjects);
+        }
+    }
+
     checkCollision(go1, go2) {
         const go1Radius = go1.getGameObject().width / 2;
         const go1X = go1.getGameObject().x;
@@ -171,6 +182,7 @@ export default class CollisionEngine {
         this.checkShipBeaconCollisions();
         this.checkShipStationCollisions();
         this.checkShipSupplyPackageCollisions();
+        this.checkBlackHoleCollisions();
         return [
             ...newFigures1,
             ...newFigures2,
