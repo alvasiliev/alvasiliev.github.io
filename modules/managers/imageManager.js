@@ -15,6 +15,7 @@ export class ImageManager {
             'missileFire',
             'beacon',
             'supplyPackage',
+            'blackHole',
         ];
         this.onLoadFinished = null;
         this.isLoaded = false;
