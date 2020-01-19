@@ -5,7 +5,9 @@ import {
     Ring,
     GameObject,
     CombinedDrawItem,
+    Circle,
 } from '../primitives.js'
+import Flash from './Flash.js';
 
 export default class BlackHole {
     constructor(x, y, radius, spinSpeed) {
@@ -30,7 +32,7 @@ export default class BlackHole {
     }
 
     _calcDestroyRadius() {
-        const origDestroyRadius = 60;
+        const origDestroyRadius = 50;
         const origHoleRadius = 250;
         return this.radius / origHoleRadius * origDestroyRadius;
     }
@@ -54,7 +56,11 @@ export default class BlackHole {
         const distance = Math.sqrt(dx * dx + dy * dy);
         if (distance < this.destroyRadius) {
             gameObject.destroy();
-            return;
+            const oW = gameObject.width,
+                oH = gameObject.height;
+            const r = oW > oH ? oW : oH;
+            const shadow = new Circle(distance, '#000', this.gameObject);
+            return new Flash(oX, oY, r * 3, shadow);
         }
 
         // calc moving to center
@@ -83,16 +89,24 @@ export default class BlackHole {
 
         const pathRy = speedRy * (timePassed / 1000);
         if (pathRy) gameObject.y += pathRy;
+        return null;
     }
 
     affect(objects) {
         const now = new Date().getTime();
         const timePassed = this.affectedAt ? now - this.affectedAt : 0;
         this.affectedAt = now;
-        if (!timePassed) return;
+        const flashes = [];
+        if (!timePassed) return flashes;
+
 
         for (let f of objects) {
-            this.affectGameObject(f.getGameObject(), timePassed);
+            const flash = this.affectGameObject(f.getGameObject(), timePassed);
+            if (flash) {
+
+                flashes.push(flash);
+            }
         }
+        return flashes;
     }
 }
